@@ -1,0 +1,308 @@
+pragma language_version >= 0.20;
+
+import CompactStandardLibrary;
+
+enum Verdict { clean, flagged }
+
+// === LEDGER STATE ===
+export ledger totalChecks: Counter;
+export ledger totalFlagged: Counter;
+export ledger lastVerdict: Verdict;
+export ledger commitment: Bytes<32>;
+export ledger lastChainHash: Bytes<32>;
+export ledger sessionActive: Boolean;
+
+// === WITNESSES (private inputs) ===
+
+// State: 3 frames for acceleration
+witness getPrevPrevPos(): Vector<2, Uint<64>>;
+witness getPrevPos(): Vector<2, Uint<64>>;
+witness getCurrPos(): Vector<2, Uint<64>>;
+witness getAction(): Uint<64>;
+witness getIsFirstMove(): Uint<64>;
+
+// Hash chain
+witness getPrevHash(): Bytes<32>;
+
+// Commit-reveal
+witness getNonce(): Bytes<32>;
+
+// Aim data: 8 aim events, each [x, y] — flattened to 16 values
+witness getAimHistory(): Vector<16, Uint<64>>;
+
+// Action history: last 8 actions
+witness getActionHistory(): Vector<8, Uint<64>>;
+
+// Tick history: last 8 tick timestamps
+witness getTickHistory(): Vector<8, Uint<64>>;
+witness getCurrentTick(): Uint<64>;
+
+// Enemy positions: 8 enemies, each [x, y] — flattened to 16 values
+witness getEnemyPositions(): Vector<16, Uint<64>>;
+
+// === HELPERS ===
+
+circuit absDiff(a: Uint<64>, b: Uint<64>): Uint<64> {
+  return a >= b ? a - b : b - a;
+}
+
+// === SESSION START ===
+export circuit startSession(genesisHash: Bytes<32>): [] {
+  lastChainHash = disclose(genesisHash);
+  sessionActive = disclose(true);
+}
+
+// === COMMIT PHASE ===
+export circuit commitMove(c: Bytes<32>): [] {
+  commitment = disclose(c);
+}
+
+// === THE MAIN CIRCUIT — 10 CHECKS ===
+// All checks compute a boolean flag. We disclose the final verdict
+// and branch only on disclosed values, satisfying Compact's privacy rules.
+
+export circuit verifyTransition(
+  maxVelocity: Uint<64>,
+  maxAcceleration: Uint<64>,
+  boundX: Uint<64>,
+  boundY: Uint<64>,
+  validActionCount: Uint<64>,
+  maxActionsPerWindow: Uint<64>,
+  windowSize: Uint<64>,
+  minDiversity: Uint<64>,
+  snapThreshold: Uint<64>,
+  maxSnaps: Uint<64>,
+  maxCorrelation: Uint<64>,
+  enemyPosHashPublic: Bytes<32>
+): Verdict {
+
+  // Load private witnesses
+  const pp = getPrevPrevPos();
+  const p  = getPrevPos();
+  const c  = getCurrPos();
+  const action = getAction();
+  const isFirst = getIsFirstMove();
+  const prevHash = getPrevHash();
+  const nonce = getNonce();
+  const aimFlat = getAimHistory();
+  const actHist = getActionHistory();
+  const tickHist = getTickHistory();
+  const now = getCurrentTick();
+  const enemyFlat = getEnemyPositions();
+
+  totalChecks.increment(1);
+
+  // ═══════════════════════════════════════════
+  // CHECK 1: HASH-CHAIN INTEGRITY
+  // ═══════════════════════════════════════════
+  const recomputedHash = persistentHash<Vector<6, Uint<64>>>(
+    [p[0], p[1], c[0], c[1], action, now]
+  );
+  assert(prevHash == lastChainHash, "Hash chain broken: prevHash mismatch");
+  lastChainHash = disclose(recomputedHash);
+
+  // ═══════════════════════════════════════════
+  // CHECK 2: COMMIT-REVEAL INTEGRITY
+  // ═══════════════════════════════════════════
+  const recomputedCommit = persistentCommit<Vector<5, Uint<64>>>(
+    [p[0], p[1], c[0], c[1], action], nonce
+  );
+  assert(recomputedCommit == commitment, "Commit-reveal mismatch: move was altered");
+
+  // ═══════════════════════════════════════════
+  // CHECK 3: VELOCITY (Manhattan distance)
+  // ═══════════════════════════════════════════
+  const dx = absDiff(c[0], p[0]);
+  const dy = absDiff(c[1], p[1]);
+  const velocity = dx + dy;
+  const check3Fail = velocity > maxVelocity ? 1 : 0;
+
+  // ═══════════════════════════════════════════
+  // CHECK 4: ACCELERATION (skip on first move)
+  // ═══════════════════════════════════════════
+  const pdx = absDiff(p[0], pp[0]);
+  const pdy = absDiff(p[1], pp[1]);
+  const prevVelocity = pdx + pdy;
+  const accel = absDiff(velocity as Uint<64>, prevVelocity as Uint<64>);
+  // Only flag if not first move AND accel exceeds max
+  const check4Fail = isFirst == 0 ? (accel > maxAcceleration ? 1 : 0) : 0;
+
+  // ═══════════════════════════════════════════
+  // CHECK 5: BOUNDS
+  // ═══════════════════════════════════════════
+  const check5Fail = (c[0] > boundX ? 1 : 0) + (c[1] > boundY ? 1 : 0);
+
+  // ═══════════════════════════════════════════
+  // CHECK 6: ACTION VALIDITY
+  // ═══════════════════════════════════════════
+  const check6Fail = action >= validActionCount ? 1 : 0;
+
+  // ═══════════════════════════════════════════
+  // CHECK 7: ACTION FREQUENCY
+  // Verify monotonicity via assertions, count actions in window
+  // ═══════════════════════════════════════════
+  assert(tickHist[0] <= tickHist[1], "Tick history not monotonic");
+  assert(tickHist[1] <= tickHist[2], "Tick history not monotonic");
+  assert(tickHist[2] <= tickHist[3], "Tick history not monotonic");
+  assert(tickHist[3] <= tickHist[4], "Tick history not monotonic");
+  assert(tickHist[4] <= tickHist[5], "Tick history not monotonic");
+  assert(tickHist[5] <= tickHist[6], "Tick history not monotonic");
+  assert(tickHist[6] <= tickHist[7], "Tick history not monotonic");
+
+  const windowStart = now - windowSize;
+  const actionsInWindow: Uint<64> =
+    (tickHist[0] >= windowStart ? 1 : 0) +
+    (tickHist[1] >= windowStart ? 1 : 0) +
+    (tickHist[2] >= windowStart ? 1 : 0) +
+    (tickHist[3] >= windowStart ? 1 : 0) +
+    (tickHist[4] >= windowStart ? 1 : 0) +
+    (tickHist[5] >= windowStart ? 1 : 0) +
+    (tickHist[6] >= windowStart ? 1 : 0) +
+    (tickHist[7] >= windowStart ? 1 : 0);
+
+  const check7Fail = actionsInWindow > maxActionsPerWindow ? 1 : 0;
+
+  // ═══════════════════════════════════════════
+  // CHECK 8: BEHAVIORAL ENTROPY
+  // Gini-Simpson: D = N² - Σ fⱼ²
+  // Count frequency of each action type (K=4)
+  // ═══════════════════════════════════════════
+  const freq0: Uint<64> = fold(
+    (acc: Uint<64>, a) => (acc + (a == 0 ? 1 : 0)) as Uint<64>,
+    0 as Uint<64>,
+    actHist
+  );
+  const freq1: Uint<64> = fold(
+    (acc: Uint<64>, a) => (acc + (a == 1 ? 1 : 0)) as Uint<64>,
+    0 as Uint<64>,
+    actHist
+  );
+  const freq2: Uint<64> = fold(
+    (acc: Uint<64>, a) => (acc + (a == 2 ? 1 : 0)) as Uint<64>,
+    0 as Uint<64>,
+    actHist
+  );
+  const freq3: Uint<64> = fold(
+    (acc: Uint<64>, a) => (acc + (a == 3 ? 1 : 0)) as Uint<64>,
+    0 as Uint<64>,
+    actHist
+  );
+
+  const sumSq = freq0 * freq0 + freq1 * freq1 + freq2 * freq2 + freq3 * freq3;
+  // diversity = 64 - sumSq; but 64 - sumSq can't underflow since max sumSq = 64
+  const diversity = 64 - sumSq;
+  const check8Fail = diversity < minDiversity ? 1 : 0;
+
+  // ═══════════════════════════════════════════
+  // CHECK 9: AIM PRECISION ANOMALY
+  // Cross product magnitude |d0x*d1y - d0y*d1x| via absDiff
+  // aimFlat: [ax0, ay0, ax1, ay1, ..., ax7, ay7] (16 values)
+  // 6 triplets from 8 aim events → count snaps
+  // ═══════════════════════════════════════════
+  const threshSq = snapThreshold * snapThreshold;
+
+  // Triplet 0: aim[0]→aim[1]→aim[2]
+  const d0x_0 = absDiff(aimFlat[2], aimFlat[0]);
+  const d0y_0 = absDiff(aimFlat[3], aimFlat[1]);
+  const d1x_0 = absDiff(aimFlat[4], aimFlat[2]);
+  const d1y_0 = absDiff(aimFlat[5], aimFlat[3]);
+  const cross0 = absDiff((d0x_0 * d1y_0) as Uint<64>, (d0y_0 * d1x_0) as Uint<64>);
+  const snap0 = cross0 * cross0 > threshSq ? 1 : 0;
+
+  // Triplet 1
+  const d0x_1 = absDiff(aimFlat[4], aimFlat[2]);
+  const d0y_1 = absDiff(aimFlat[5], aimFlat[3]);
+  const d1x_1 = absDiff(aimFlat[6], aimFlat[4]);
+  const d1y_1 = absDiff(aimFlat[7], aimFlat[5]);
+  const cross1 = absDiff((d0x_1 * d1y_1) as Uint<64>, (d0y_1 * d1x_1) as Uint<64>);
+  const snap1 = cross1 * cross1 > threshSq ? 1 : 0;
+
+  // Triplet 2
+  const d0x_2 = absDiff(aimFlat[6], aimFlat[4]);
+  const d0y_2 = absDiff(aimFlat[7], aimFlat[5]);
+  const d1x_2 = absDiff(aimFlat[8], aimFlat[6]);
+  const d1y_2 = absDiff(aimFlat[9], aimFlat[7]);
+  const cross2 = absDiff((d0x_2 * d1y_2) as Uint<64>, (d0y_2 * d1x_2) as Uint<64>);
+  const snap2 = cross2 * cross2 > threshSq ? 1 : 0;
+
+  // Triplet 3
+  const d0x_3 = absDiff(aimFlat[8], aimFlat[6]);
+  const d0y_3 = absDiff(aimFlat[9], aimFlat[7]);
+  const d1x_3 = absDiff(aimFlat[10], aimFlat[8]);
+  const d1y_3 = absDiff(aimFlat[11], aimFlat[9]);
+  const cross3 = absDiff((d0x_3 * d1y_3) as Uint<64>, (d0y_3 * d1x_3) as Uint<64>);
+  const snap3 = cross3 * cross3 > threshSq ? 1 : 0;
+
+  // Triplet 4
+  const d0x_4 = absDiff(aimFlat[10], aimFlat[8]);
+  const d0y_4 = absDiff(aimFlat[11], aimFlat[9]);
+  const d1x_4 = absDiff(aimFlat[12], aimFlat[10]);
+  const d1y_4 = absDiff(aimFlat[13], aimFlat[11]);
+  const cross4 = absDiff((d0x_4 * d1y_4) as Uint<64>, (d0y_4 * d1x_4) as Uint<64>);
+  const snap4 = cross4 * cross4 > threshSq ? 1 : 0;
+
+  // Triplet 5
+  const d0x_5 = absDiff(aimFlat[12], aimFlat[10]);
+  const d0y_5 = absDiff(aimFlat[13], aimFlat[11]);
+  const d1x_5 = absDiff(aimFlat[14], aimFlat[12]);
+  const d1y_5 = absDiff(aimFlat[15], aimFlat[13]);
+  const cross5 = absDiff((d0x_5 * d1y_5) as Uint<64>, (d0y_5 * d1x_5) as Uint<64>);
+  const snap5 = cross5 * cross5 > threshSq ? 1 : 0;
+
+  const totalSnaps = snap0 + snap1 + snap2 + snap3 + snap4 + snap5;
+  const check9Fail = totalSnaps > maxSnaps ? 1 : 0;
+
+  // ═══════════════════════════════════════════
+  // CHECK 10: INFORMATION LEAKAGE (WALLHACK)
+  // Verify enemy position integrity, then check correlation
+  // enemyFlat: [ex0, ey0, ex1, ey1, ..., ex7, ey7] (16 values)
+  // ═══════════════════════════════════════════
+  const recomputedEnemyHash = persistentHash<Vector<16, Uint<64>>>(enemyFlat);
+  assert(recomputedEnemyHash == enemyPosHashPublic, "Enemy position hash mismatch");
+
+  // Correlation: for each enemy, check if player moved toward it
+  const movingRight = c[0] > p[0] ? 1 : 0;
+  const movingUp    = c[1] > p[1] ? 1 : 0;
+
+  const towardX0 = movingRight == (enemyFlat[0] > c[0] ? 1 : 0) ? 1 : 0;
+  const towardY0 = movingUp    == (enemyFlat[1] > c[1] ? 1 : 0) ? 1 : 0;
+  const towardX1 = movingRight == (enemyFlat[2] > c[0] ? 1 : 0) ? 1 : 0;
+  const towardY1 = movingUp    == (enemyFlat[3] > c[1] ? 1 : 0) ? 1 : 0;
+  const towardX2 = movingRight == (enemyFlat[4] > c[0] ? 1 : 0) ? 1 : 0;
+  const towardY2 = movingUp    == (enemyFlat[5] > c[1] ? 1 : 0) ? 1 : 0;
+  const towardX3 = movingRight == (enemyFlat[6] > c[0] ? 1 : 0) ? 1 : 0;
+  const towardY3 = movingUp    == (enemyFlat[7] > c[1] ? 1 : 0) ? 1 : 0;
+  const towardX4 = movingRight == (enemyFlat[8] > c[0] ? 1 : 0) ? 1 : 0;
+  const towardY4 = movingUp    == (enemyFlat[9] > c[1] ? 1 : 0) ? 1 : 0;
+  const towardX5 = movingRight == (enemyFlat[10] > c[0] ? 1 : 0) ? 1 : 0;
+  const towardY5 = movingUp    == (enemyFlat[11] > c[1] ? 1 : 0) ? 1 : 0;
+  const towardX6 = movingRight == (enemyFlat[12] > c[0] ? 1 : 0) ? 1 : 0;
+  const towardY6 = movingUp    == (enemyFlat[13] > c[1] ? 1 : 0) ? 1 : 0;
+  const towardX7 = movingRight == (enemyFlat[14] > c[0] ? 1 : 0) ? 1 : 0;
+  const towardY7 = movingUp    == (enemyFlat[15] > c[1] ? 1 : 0) ? 1 : 0;
+
+  const totalCorrelation =
+    towardX0 + towardY0 + towardX1 + towardY1 +
+    towardX2 + towardY2 + towardX3 + towardY3 +
+    towardX4 + towardY4 + towardX5 + towardY5 +
+    towardX6 + towardY6 + towardX7 + towardY7;
+
+  const check10Fail = totalCorrelation > maxCorrelation ? 1 : 0;
+
+  // ═══════════════════════════════════════════
+  // AGGREGATE: any check failed?
+  // ═══════════════════════════════════════════
+  const anyFailed = check3Fail + check4Fail + check5Fail + check6Fail +
+                    check7Fail + check8Fail + check9Fail + check10Fail;
+
+  const isFlagged = disclose(anyFailed > 0);
+
+  if (isFlagged) {
+    totalFlagged.increment(1);
+    lastVerdict = Verdict.flagged;
+    return Verdict.flagged;
+  }
+
+  lastVerdict = Verdict.clean;
+  return Verdict.clean;
+}
