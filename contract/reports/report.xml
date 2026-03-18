@@ -1,49 +1,49 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="10" failures="0" errors="0" time="0.10854825">
-    <testsuite name="src/test/verdict.test.ts" timestamp="2026-03-18T06:00:28.696Z" hostname="Arkos-MacBook-Air.local" tests="10" failures="0" errors="0" skipped="0" time="0.10854825">
-        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; initializes ledger state correctly" time="0.018852042">
+<testsuites name="vitest tests" tests="10" failures="0" errors="0" time="0.110811833">
+    <testsuite name="src/test/verdict.test.ts" timestamp="2026-03-18T12:40:23.637Z" hostname="Arkos-MacBook-Air.local" tests="10" failures="0" errors="0" skipped="0" time="0.110811833">
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; initializes ledger state correctly" time="0.018899667">
         </testcase>
-        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; startSession sets sessionActive and lastChainHash" time="0.006372">
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; startSession sets sessionActive and lastChainHash" time="0.006630792">
         </testcase>
-        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; commitMove stores commitment on ledger" time="0.006274416">
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; commitMove stores commitment on ledger" time="0.006518667">
         </testcase>
-        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CLEAN move → verdict = clean (0), totalFlagged = 0" time="0.014038875">
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CLEAN move → verdict = clean (0), totalFlagged = 0" time="0.014927583">
             <system-out>
 CLEAN: { verdict: [33m0[39m, totalChecks: [33m1n[39m, totalFlagged: [33m0n[39m }
 
             </system-out>
         </testcase>
-        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 3: TELEPORT → flagged (velocity = 1590 &gt; 100)" time="0.011529958">
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 3: TELEPORT → flagged (velocity = 1590 &gt; 100)" time="0.011601667">
             <system-out>
 TELEPORT: { verdict: [33m1[39m, totalFlagged: [33m1n[39m }
 
             </system-out>
         </testcase>
-        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 5: OUT OF BOUNDS → flagged (x = 1001 &gt; 1000)" time="0.010504">
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 5: OUT OF BOUNDS → flagged (x = 1001 &gt; 1000)" time="0.010910792">
             <system-out>
 OOB: { verdict: [33m1[39m, totalFlagged: [33m1n[39m }
 
             </system-out>
         </testcase>
-        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 6: INVALID ACTION → flagged (action = 99 &gt;= 4)" time="0.010431916">
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 6: INVALID ACTION → flagged (action = 99 &gt;= 4)" time="0.010766584">
             <system-out>
 INVALID ACTION: { verdict: [33m1[39m, totalFlagged: [33m1n[39m }
 
             </system-out>
         </testcase>
-        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 8: BOT → flagged (all same actions, diversity = 0)" time="0.010442958">
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 8: BOT → flagged (all same actions, diversity = 0)" time="0.010407125">
             <system-out>
 BOT: { verdict: [33m1[39m, totalFlagged: [33m1n[39m }
 
             </system-out>
         </testcase>
-        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 4: SPEED RAMP → flagged (accel = 90 &gt; 50)" time="0.010123916">
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 4: SPEED RAMP → flagged (accel = 90 &gt; 50)" time="0.010265167">
             <system-out>
 SPEED RAMP: { verdict: [33m1[39m, totalFlagged: [33m1n[39m }
 
             </system-out>
         </testcase>
-        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; totalChecks increments on each verifyTransition call" time="0.00926725">
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; totalChecks increments on each verifyTransition call" time="0.009154292">
             <system-out>
 After 1 verify: totalChecks = [33m1n[39m
 

@@ -101,7 +101,7 @@ Tick 1-N: Player plays normally       Batch collects transitions locally
 
 ---
 
-## BUILD STATUS — Steps 1 & 2 COMPLETE
+## BUILD STATUS — Steps 1, 2 & 3 COMPLETE
 
 ### Step 1: Compact Contract ✅
 - **File:** `contract/src/verdict.compact` (~300 lines)
@@ -135,6 +135,23 @@ BOT (no entropy) → verdict = 1 (flagged), totalFlagged = 1  ✅ CHECK 8
 SPEED RAMP       → verdict = 1 (flagged), totalFlagged = 1  ✅ CHECK 4
 Counter accumulation: totalChecks increments correctly       ✅
 ```
+
+### Step 3: Next.js Demo App (Grid Arena) ✅
+- **Directory:** `verdict-demo/` — Next.js 14 (App Router) + TypeScript + Tailwind
+- **Game engine:** `src/game/engine.ts` — full local verification mirroring all 10 circuit checks
+- **Game rules:** `src/game/rules.ts` — `GameRules` interface + `DEFAULT_RULES` (10x10 grid)
+- **Cheat simulators:** `src/game/cheats.ts` — 5 cheat types (teleport, speed ramp, bot loop, aimbot, wallhack)
+- **Components built:**
+  - `GridArena.tsx` — 10x10 grid with player token + hidden enemy positions
+  - `CheckGrid.tsx` — 10-check pass/fail status display
+  - `CheatSimulator.tsx` — 5 buttons, each triggers different check
+  - `MoveLog.tsx` — annotated move history with check results
+  - `StatsPanel.tsx` — live velocity/acceleration/entropy bars + counters
+  - `ComparisonPanel.tsx` — VERDICT vs Vanguard comparison table
+  - `AnyGamePanel.tsx` — "Any Game, Write Constraints" product vision
+- **Main page:** `src/app/page.tsx` — 3-column layout (game | checks | product panels), tabbed right panel
+- **Features:** Arrow key movement, show/hide enemies toggle, reset, real-time verification on every move
+- **Not yet tested:** Needs `npm run build` / `npm run dev` verification
 
 ### Devnet Deployment — BLOCKED on funding
 - Proof server running on localhost:6300
