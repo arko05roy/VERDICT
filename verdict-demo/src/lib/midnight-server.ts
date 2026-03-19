@@ -289,15 +289,19 @@ export async function connect(network: string, seed?: string): Promise<{
         );
         const finalized = await walletCtx.wallet.finalizeRecipe(recipe);
         await walletCtx.wallet.submitTransaction(finalized);
-        console.log("[midnight-server] Dust registration submitted, waiting for dust (30s timeout)...");
+        console.log("[midnight-server] Dust registration submitted, waiting for dust (5min timeout)...");
         await Rx.firstValueFrom(
           walletCtx.wallet.state().pipe(
             Rx.throttleTime(5_000),
+            Rx.tap((s) => {
+              const dustBal = s.dust?.balance(new Date()) ?? BigInt(0);
+              console.log("[midnight-server] Dust balance:", dustBal.toString());
+            }),
             Rx.filter((s) => (s.dust?.balance(new Date()) ?? BigInt(0)) > BigInt(0)),
-            Rx.timeout(30_000),
+            Rx.timeout(300_000),
           ),
         ).catch(() => {
-          console.warn("[midnight-server] Dust wait timed out — continuing without dust");
+          console.error("[midnight-server] Dust wait timed out after 5min — deploy will likely fail without dust");
         });
         console.log("[midnight-server] Dust step complete");
       }
