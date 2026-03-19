@@ -6,7 +6,7 @@ import { FAMOUS_GAMES } from "@/lib/famous-games";
 import { DEFAULT_RULES, type GameRules } from "@/game/rules";
 import ReplayTimeline from "@/components/ReplayTimeline";
 import CheckGrid from "@/components/CheckGrid";
-import { getLedgerState, gameStateToPrivateWitness } from "@/lib/midnight";
+import { getLedgerState, gameStateToPrivateWitness, getConnection } from "@/lib/midnight";
 
 const CHESS_RULES: GameRules = {
   ...DEFAULT_RULES,
@@ -32,6 +32,11 @@ export default function ReplayPage() {
 
   const handleAnalyze = async () => {
     console.log("[replay] Analyzing PGN, length:", input.length);
+    const conn = getConnection();
+    if (!conn.connected || !conn.contractAddress) {
+      setError("Connect wallet and deploy contract first (use the Passport page)");
+      return;
+    }
     setError(null);
     setLoading(true);
     setProgress("Initializing ZK verification...");
@@ -54,6 +59,12 @@ export default function ReplayPage() {
 
   const loadFamousGame = async (game: (typeof FAMOUS_GAMES)[number]) => {
     console.log("[replay] Loading famous game:", game.name);
+    const conn = getConnection();
+    if (!conn.connected || !conn.contractAddress) {
+      setInput(game.pgn);
+      setError("Connect wallet and deploy contract first (use the Passport page)");
+      return;
+    }
     setInput(game.pgn);
     setError(null);
     setLoading(true);

@@ -10,21 +10,21 @@
   "dependencies": {
     "@midnight-ntwrk/compact-js": "*",
     "@midnight-ntwrk/compact-runtime": "*",
-    "@midnight-ntwrk/ledger-v7": "*",
+    "@midnight-ntwrk/ledger-v7": "7.0.2",
     "@midnight-ntwrk/midnight-js-contracts": "*",
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "*",
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "*",
     "@midnight-ntwrk/midnight-js-level-private-state-provider": "*",
-    "@midnight-ntwrk/midnight-js-network-id": "*",
+    "@midnight-ntwrk/midnight-js-network-id": "3.1.0",
     "@midnight-ntwrk/midnight-js-node-zk-config-provider": "*",
     "@midnight-ntwrk/midnight-js-types": "*",
     "@midnight-ntwrk/midnight-js-utils": "*",
     "@midnight-ntwrk/verdict-contract": "*",
-    "@midnight-ntwrk/wallet-sdk-dust-wallet": "*",
-    "@midnight-ntwrk/wallet-sdk-facade": "*",
-    "@midnight-ntwrk/wallet-sdk-hd": "*",
-    "@midnight-ntwrk/wallet-sdk-shielded": "*",
-    "@midnight-ntwrk/wallet-sdk-unshielded-wallet": "*",
+    "@midnight-ntwrk/wallet-sdk-dust-wallet": "2.0.0",
+    "@midnight-ntwrk/wallet-sdk-facade": "2.0.0",
+    "@midnight-ntwrk/wallet-sdk-hd": "3.0.1",
+    "@midnight-ntwrk/wallet-sdk-shielded": "2.0.0",
+    "@midnight-ntwrk/wallet-sdk-unshielded-wallet": "2.0.0",
     "chess.js": "^1.4.0",
     "next": "16.1.7",
     "pino": "^10.3.1",
@@ -41,5 +41,14 @@
     "@types/ws": "^8",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "resolutions": {
+    "@midnight-ntwrk/ledger-v7": "7.0.2",
+    "@midnight-ntwrk/midnight-js-network-id": "3.1.0",
+    "@midnight-ntwrk/wallet-sdk-dust-wallet": "2.0.0",
+    "@midnight-ntwrk/wallet-sdk-facade": "2.0.0",
+    "@midnight-ntwrk/wallet-sdk-hd": "3.0.1",
+    "@midnight-ntwrk/wallet-sdk-shielded": "2.0.0",
+    "@midnight-ntwrk/wallet-sdk-unshielded-wallet": "2.0.0"
   }
 }

@@ -36,7 +36,7 @@ export interface LedgerState {
 
 export interface MidnightConnection {
   connected: boolean;
-  network: "standalone" | "preprod" | "preview" | "offline";
+  network: "standalone" | "offline";
   contractAddress: string | null;
   walletAddress: string | null;
   balance: bigint;
@@ -193,7 +193,7 @@ export async function verifyTransitionZK(
   console.log("[midnight] pos:", `(${state.player.x},${state.player.y})`, "prev:", `(${state.prevPos.x},${state.prevPos.y})`, "tick:", state.tick);
 
   if (!connection.connected || !connection.contractAddress) {
-    console.error("[midnight] Not connected — connect wallet and deploy contract first");
+    throw new Error("Not connected — connect wallet and deploy contract first");
   }
 
   const witness = gameStateToPrivateWitness(state);
@@ -251,7 +251,7 @@ export async function verifyReplayZK(states: GameState[], rules: GameRules): Pro
 
 // --- Connection (calls real Midnight SDK via API routes) ---
 
-export async function connectWallet(network: "standalone" | "preprod" | "preview" = "standalone"): Promise<MidnightConnection> {
+export async function connectWallet(network: "standalone" | "offline" = "standalone"): Promise<MidnightConnection> {
   console.log(`[midnight] ---- connectWallet(${network}) ----`);
 
   const result = await callAPI("connect", { network });

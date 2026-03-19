@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     switch (action) {
       // ─── Connection ───
       case "connect": {
-        const network = (body.network as string) || "preprod";
+        const network = (body.network as string) || "standalone";
         const seed = body.seed as string | undefined;
         const result = await midnight.connect(network, seed);
         return json({ ok: true, ...result });
