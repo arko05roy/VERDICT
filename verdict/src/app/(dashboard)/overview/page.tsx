@@ -2,13 +2,6 @@
 
 import { useState, useEffect } from "react";
 
-const STATS = [
-  { label: "RULESETS DEPLOYED", value: "2,847", delta: "+12 24h" },
-  { label: "TOTAL VERIFICATIONS", value: "1.2M", delta: "+8,431 24h" },
-  { label: "ACTIVE GAMES", value: "384", delta: "+7 24h" },
-  { label: "FLAGGED RATE", value: "0.03%", delta: "avg" },
-];
-
 const CHECKS = [
   { n: 1, name: "Hash-chain integrity", type: "Cryptographic" },
   { n: 2, name: "Commit-reveal", type: "Cryptographic" },
@@ -29,23 +22,47 @@ type FeedEntry = {
   checks: string;
   time: string;
   block: number;
+  totalChecks: number;
+  totalFlagged: number;
+};
+
+type FeedResponse = {
+  entries: FeedEntry[];
+  blockHeight: number;
+  rulesetCount: number;
 };
 
 export default function OverviewPage() {
   const [feed, setFeed] = useState<FeedEntry[]>([]);
+  const [blockHeight, setBlockHeight] = useState(0);
+  const [rulesetCount, setRulesetCount] = useState(0);
 
   useEffect(() => {
     async function fetchFeed() {
       try {
         const res = await fetch("/api/feed");
-        const data = await res.json();
-        setFeed(data.entries);
+        const data: FeedResponse = await res.json();
+        setFeed(data.entries || []);
+        setBlockHeight(data.blockHeight || 0);
+        setRulesetCount(data.rulesetCount || 0);
       } catch {}
     }
     fetchFeed();
     const interval = setInterval(fetchFeed, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const totalChecks = feed.reduce((sum, e) => sum + (e.totalChecks || 0), 0);
+  const totalFlagged = feed.reduce((sum, e) => sum + (e.totalFlagged || 0), 0);
+  const flaggedRate =
+    totalChecks > 0 ? ((totalFlagged / totalChecks) * 100).toFixed(2) : "0.00";
+
+  const STATS = [
+    { label: "RULESETS DEPLOYED", value: String(rulesetCount), delta: "on-chain" },
+    { label: "TOTAL VERIFICATIONS", value: String(totalChecks), delta: "proofs" },
+    { label: "BLOCK HEIGHT", value: blockHeight.toLocaleString(), delta: "live" },
+    { label: "FLAGGED RATE", value: `${flaggedRate}%`, delta: "avg" },
+  ];
 
   return (
     <div className="p-6 space-y-6">
