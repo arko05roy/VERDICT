@@ -15,7 +15,12 @@ export default function IntegratePage() {
   return (
     <div className="p-6 max-w-3xl">
       <div className="mb-6">
-        <h1 className="text-lg text-[var(--text-primary)] font-bold tracking-wide">
+        <div className="flex items-center gap-2 mb-3 opacity-40">
+          <div className="w-6 h-px bg-white" />
+          <span className="text-white text-[10px]">◈</span>
+          <div className="w-16 h-px bg-white" />
+        </div>
+        <h1 className="text-lg text-white font-bold tracking-wide">
           Integrate
         </h1>
         <p className="text-[11px] text-[var(--text-muted)] mt-1">
@@ -24,7 +29,7 @@ export default function IntegratePage() {
       </div>
 
       {/* Ruleset selector */}
-      <div className="border border-[var(--border)] bg-[var(--bg-secondary)] mb-4">
+      <div className="panel corner-frame mb-4">
         <div className="px-4 py-2 border-b border-[var(--border)]">
           <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
             Select Ruleset
@@ -37,12 +42,12 @@ export default function IntegratePage() {
       </div>
 
       {/* Code snippet */}
-      <div className="border border-[var(--border)] bg-[var(--bg-secondary)] noise mb-6">
+      <div className="panel corner-frame mb-6">
         <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border)]">
           <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
             SDK Snippet · TypeScript
           </span>
-          <button className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors cursor-pointer">
+          <button className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer">
             Copy
           </button>
         </div>
@@ -70,18 +75,18 @@ export default function IntegratePage() {
         </pre>
       </div>
 
-      {/* Language tabs */}
+      {/* Language tabs — hard bottom border */}
       <div className="mb-6">
         <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2 block">
           Also Available In
         </span>
-        <div className="flex gap-2">
+        <div className="flex gap-0">
           {["TypeScript", "Python", "Rust", "Go"].map((lang, i) => (
             <span
               key={lang}
-              className={`text-[10px] uppercase tracking-wider px-3 py-1 border cursor-pointer transition-all ${
+              className={`text-[10px] uppercase tracking-wider px-3 py-1.5 border cursor-pointer transition-all ${
                 i === 0
-                  ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-glow)]"
+                  ? "border-white text-white border-b-2 border-b-white bg-[var(--bg-hover)]"
                   : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--border-active)]"
               }`}
             >
@@ -91,27 +96,30 @@ export default function IntegratePage() {
         </div>
       </div>
 
-      {/* How it works */}
-      <div className="border border-[var(--border)] bg-[var(--bg-secondary)] noise">
+      {/* How it works — with dither separators between steps */}
+      <div className="panel corner-frame">
         <div className="px-4 py-2 border-b border-[var(--border)]">
           <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
             How It Works
           </span>
         </div>
-        <div className="p-4 space-y-3">
+        <div className="p-4">
           {[
             ["1", "Game client captures state transition (position, action, timing)"],
             ["2", "SDK submits transition to VERDICT as a ZK witness (private)"],
             ["3", "Circuit runs 10 integrity checks inside zero-knowledge proof"],
             ["4", "Proof settles on Midnight — returns CLEAN or FLAGGED"],
-          ].map(([n, desc]) => (
-            <div key={n} className="flex gap-3 items-start">
-              <span className="text-[var(--accent)] text-xs font-bold shrink-0 w-4">
-                {n}.
-              </span>
-              <span className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                {desc}
-              </span>
+          ].map(([n, desc], i) => (
+            <div key={n}>
+              <div className="flex gap-3 items-start py-3">
+                <span className="text-white text-xs font-bold shrink-0 w-5 h-5 border border-[var(--border-bright)] flex items-center justify-center">
+                  {n}
+                </span>
+                <span className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                  {desc}
+                </span>
+              </div>
+              {i < 3 && <div className="dither-sep ml-8" />}
             </div>
           ))}
         </div>

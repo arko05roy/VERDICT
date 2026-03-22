@@ -15,11 +15,11 @@ const RULESETS: Record<string, any> = {
     avgProofTime: "3.2s",
     checks: [
       "Velocity cannot exceed 8 units per tick",
-      "Acceleration delta capped at 3 units/tick²",
+      "Acceleration delta capped at 3 units/tick\u00B2",
       "Position must stay within map bounds (0-2000)",
       "Max 12 actions per second",
       "Behavioral entropy must exceed threshold",
-      "Aim snap angle cannot exceed 45° per frame",
+      "Aim snap angle cannot exceed 45\u00B0 per frame",
       "No information leakage from hidden positions",
     ],
     compact: `pragma language_version 0.21;
@@ -119,7 +119,7 @@ export default async function RulesetDetailPage({ params }: { params: Promise<{ 
     return (
       <div className="p-6">
         <p className="text-[var(--text-muted)] text-sm">Ruleset not found.</p>
-        <Link href="/explore" className="text-[var(--accent)] text-xs mt-2 inline-block">
+        <Link href="/explore" className="text-white text-xs mt-2 inline-block hover:underline">
           ← Back to Explore
         </Link>
       </div>
@@ -136,15 +136,20 @@ const proof = await v.verify(stateTransition);`;
       <div>
         <Link
           href="/explore"
-          className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider hover:text-[var(--accent)] transition-colors"
+          className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider hover:text-white transition-colors"
         >
           ← Explore
         </Link>
+        <div className="flex items-center gap-2 mt-3 mb-1 opacity-40">
+          <div className="w-6 h-px bg-white" />
+          <span className="text-white text-[10px]">◈</span>
+          <div className="w-16 h-px bg-white" />
+        </div>
         <div className="flex items-center gap-3 mt-2">
-          <h1 className="text-lg text-[var(--text-primary)] font-bold tracking-wide">
+          <h1 className="text-lg text-white font-bold tracking-wide">
             {ruleset.name}
           </h1>
-          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 border border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-glow)]">
+          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 border border-white text-white">
             {ruleset.category}
           </span>
         </div>
@@ -156,7 +161,7 @@ const proof = await v.verify(stateTransition);`;
         </p>
       </div>
 
-      {/* Stats row */}
+      {/* Stats row with corner frames */}
       <div className="grid grid-cols-5 gap-3">
         {[
           { label: "VERIFICATIONS", value: ruleset.verifications },
@@ -165,26 +170,26 @@ const proof = await v.verify(stateTransition);`;
           { label: "UPTIME", value: ruleset.uptime },
           { label: "AVG PROOF TIME", value: ruleset.avgProofTime },
         ].map((s) => (
-          <div key={s.label} className="border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2.5">
+          <div key={s.label} className="panel corner-frame px-3 py-2.5">
             <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider mb-0.5">
               {s.label}
             </div>
-            <span className="text-sm text-[var(--text-primary)] font-bold">{s.value}</span>
+            <span className="text-sm text-white font-bold">{s.value}</span>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-2 gap-6">
         {/* Live feed */}
-        <div className="border border-[var(--border)] bg-[var(--bg-secondary)] noise">
+        <div className="panel corner-frame">
           <div className="px-4 py-2.5 border-b border-[var(--border)] flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] live-dot" />
+            <span className="w-1.5 h-1.5 bg-[var(--accent)] live-dot" />
             <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
               Live Verification Feed
             </span>
           </div>
           {FEED.map((f, i) => (
-            <div key={i} className="flex items-center px-4 py-2 border-b border-[var(--border)] last:border-b-0">
+            <div key={i} className={`flex items-center px-4 py-2 border-b border-[var(--border)] last:border-b-0 ${f.verdict === "FLAGGED" ? "row-flagged" : ""}`}>
               <span className="text-[10px] text-[var(--text-secondary)] flex-1 font-mono">{f.player}</span>
               <span className={`text-[10px] uppercase tracking-wider font-bold mr-4 ${f.verdict === "CLEAN" ? "text-[var(--accent)]" : "text-[var(--danger)]"}`}>
                 {f.verdict}
@@ -195,9 +200,9 @@ const proof = await v.verify(stateTransition);`;
           ))}
         </div>
 
-        {/* Rules */}
+        {/* Rules + SDK */}
         <div className="space-y-4">
-          <div className="border border-[var(--border)] bg-[var(--bg-secondary)] noise">
+          <div className="panel corner-frame">
             <div className="px-4 py-2.5 border-b border-[var(--border)]">
               <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
                 Rules · Human Readable
@@ -213,8 +218,7 @@ const proof = await v.verify(stateTransition);`;
             ))}
           </div>
 
-          {/* SDK snippet */}
-          <div className="border border-[var(--border)] bg-[var(--bg-secondary)] noise">
+          <div className="panel corner-frame">
             <div className="px-4 py-2.5 border-b border-[var(--border)]">
               <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
                 SDK Integration
@@ -228,7 +232,7 @@ const proof = await v.verify(stateTransition);`;
       </div>
 
       {/* Compact source */}
-      <div className="border border-[var(--border)] bg-[var(--bg-secondary)] noise">
+      <div className="panel corner-frame">
         <div className="px-4 py-2.5 border-b border-[var(--border)]">
           <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
             Compact Source
@@ -251,14 +255,15 @@ const proof = await v.verify(stateTransition);`;
       </div>
 
       {/* Disputes */}
-      <div className="border border-[var(--border)] bg-[var(--bg-secondary)] noise">
+      <div className="panel corner-frame">
         <div className="px-4 py-2.5 border-b border-[var(--border)]">
           <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
             Disputes / Flags
           </span>
         </div>
+        <div className="mx-4"><div className="dither-sep" /></div>
         {DISPUTES.map((d) => (
-          <div key={d.id} className="flex items-center px-4 py-2.5 border-b border-[var(--border)] last:border-b-0">
+          <div key={d.id} className={`flex items-center px-4 py-2.5 border-b border-[var(--border)] last:border-b-0 ${d.status === "open" ? "row-flagged" : ""}`}>
             <span className="text-[10px] text-[var(--text-secondary)] font-bold w-16">{d.id}</span>
             <span className="text-[10px] text-[var(--text-secondary)] font-mono w-28">{d.player}</span>
             <span className="text-xs text-[var(--text-primary)] flex-1">{d.reason}</span>
