@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const EXAMPLE_RULES = `Players cannot move faster than 5 units per tick
 Cards must be in the player's hand before playing
 RNG must be committed before the bet is placed
 No action can exceed 10 per second
 Position must stay within map bounds (0-1000)`;
+
+type ModalStep = 0 | 1 | 2 | 3; // 0 = no modal, 1 = define, 2 = review, 3 = deploy result
 
 export default function DeployPage() {
   const [rules, setRules] = useState("");
@@ -16,9 +18,48 @@ export default function DeployPage() {
   const [compact, setCompact] = useState("");
   const [compiling, setCompiling] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState(1);
+  const [modal, setModal] = useState<ModalStep>(0);
   const [deploying, setDeploying] = useState(false);
   const [deployResult, setDeployResult] = useState<any>(null);
+  const [transitioning, setTransitioning] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [rulesets, setRulesets] = useState<any[]>([]);
+
+  // Fetch previously deployed rulesets
+  useEffect(() => {
+    fetch("/api/rulesets")
+      .then((r) => r.json())
+      .then((d) => setRulesets(d.rulesets || []))
+      .catch(() => {});
+  }, [deployResult]);
+
+  // Animate modal in
+  useEffect(() => {
+    if (modal > 0) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setModalVisible(true));
+      });
+    }
+  }, [modal]);
+
+  const transitionTo = useCallback((next: ModalStep) => {
+    setTransitioning(true);
+    setModalVisible(false);
+    setTimeout(() => {
+      setModal(next);
+      setTransitioning(false);
+      if (next > 0) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => setModalVisible(true));
+        });
+      }
+    }, 350);
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setModalVisible(false);
+    setTimeout(() => setModal(0), 350);
+  }, []);
 
   async function handleCompile() {
     if (!rules.trim()) return;
@@ -40,7 +81,7 @@ export default function DeployPage() {
       }
 
       setCompact(data.compact);
-      setStep(2);
+      transitionTo(2);
     } catch (e: any) {
       setError(e.message || "Network error");
     } finally {
@@ -70,7 +111,7 @@ export default function DeployPage() {
         return;
       }
       setDeployResult(data);
-      setStep(3);
+      transitionTo(3);
     } catch (e: any) {
       setError(e.message || "Network error");
     } finally {
@@ -78,299 +119,759 @@ export default function DeployPage() {
     }
   }
 
+  function resetAll() {
+    setRules("");
+    setName("");
+    setCategory("");
+    setDescription("");
+    setCompact("");
+    setDeployResult(null);
+    setError("");
+    closeModal();
+  }
+
+  const tarotCards = [
+    {
+      n: 1,
+      label: "DEFINE",
+      numeral: "I",
+      title: "The Scribe",
+      desc: "Write game rules in plain English",
+      symbol: (
+        <svg viewBox="0 0 80 100" className="w-16 h-20 mx-auto" fill="none" stroke="currentColor" strokeWidth="1">
+          {/* Quill / scroll */}
+          <path d="M40 10 L55 30 L50 90 L40 85 L30 90 L25 30 Z" strokeWidth="0.8" />
+          <path d="M30 40 L50 40" strokeWidth="0.5" opacity="0.5" />
+          <path d="M32 50 L48 50" strokeWidth="0.5" opacity="0.5" />
+          <path d="M33 60 L47 60" strokeWidth="0.5" opacity="0.5" />
+          <path d="M34 70 L46 70" strokeWidth="0.5" opacity="0.5" />
+          <circle cx="40" cy="25" r="4" strokeWidth="0.8" />
+          <path d="M36 25 L44 25 M40 21 L40 29" strokeWidth="0.5" />
+        </svg>
+      ),
+    },
+    {
+      n: 2,
+      label: "REVIEW",
+      numeral: "II",
+      title: "The Oracle",
+      desc: "Inspect compiled Compact ZK circuit",
+      symbol: (
+        <svg viewBox="0 0 80 100" className="w-16 h-20 mx-auto" fill="none" stroke="currentColor" strokeWidth="1">
+          {/* Eye of truth */}
+          <ellipse cx="40" cy="45" rx="25" ry="16" strokeWidth="0.8" />
+          <circle cx="40" cy="45" r="8" strokeWidth="0.8" />
+          <circle cx="40" cy="45" r="3" strokeWidth="0.8" />
+          <path d="M40 20 L40 29" strokeWidth="0.5" />
+          <path d="M40 61 L40 70" strokeWidth="0.5" />
+          <path d="M20 30 L27 35" strokeWidth="0.5" />
+          <path d="M60 30 L53 35" strokeWidth="0.5" />
+          <path d="M20 60 L27 55" strokeWidth="0.5" />
+          <path d="M60 60 L53 55" strokeWidth="0.5" />
+          {/* Rays */}
+          <path d="M40 12 L38 18 L40 16 L42 18 Z" strokeWidth="0.5" />
+          <path d="M40 78 L38 72 L40 74 L42 72 Z" strokeWidth="0.5" />
+        </svg>
+      ),
+    },
+    {
+      n: 3,
+      label: "DEPLOY",
+      numeral: "III",
+      title: "The Architect",
+      desc: "Push to Midnight network",
+      symbol: (
+        <svg viewBox="0 0 80 100" className="w-16 h-20 mx-auto" fill="none" stroke="currentColor" strokeWidth="1">
+          {/* Tower / structure */}
+          <path d="M40 10 L60 35 L55 90 L25 90 L20 35 Z" strokeWidth="0.8" />
+          <path d="M40 10 L40 30" strokeWidth="0.5" />
+          <rect x="34" y="45" width="12" height="15" strokeWidth="0.8" />
+          <path d="M40 45 L40 60" strokeWidth="0.5" />
+          <path d="M34 52 L46 52" strokeWidth="0.5" />
+          {/* Base lines */}
+          <path d="M28 75 L52 75" strokeWidth="0.5" opacity="0.5" />
+          <path d="M26 82 L54 82" strokeWidth="0.5" opacity="0.5" />
+          {/* Crown */}
+          <path d="M35 10 L40 5 L45 10" strokeWidth="0.8" />
+          <circle cx="40" cy="5" r="2" strokeWidth="0.5" />
+        </svg>
+      ),
+    },
+  ];
+
   return (
-    <div className="p-6">
+    <div className="p-6 relative">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-3 opacity-40">
-          <div className="w-6 h-px bg-white" />
+      <div className="mb-10 text-center">
+        <div className="flex items-center justify-center gap-3 mb-4 opacity-30">
+          <div className="w-12 h-px bg-white" />
           <span className="text-white text-[10px]">◈</span>
-          <div className="w-16 h-px bg-white" />
+          <div className="w-12 h-px bg-white" />
         </div>
-        <h1 className="text-lg text-white font-bold tracking-wide">
+        <h1 className="text-lg text-white font-bold tracking-[0.2em] uppercase">
           Deploy Ruleset
         </h1>
-        <p className="text-[11px] text-[var(--text-muted)] mt-1">
-          Define rules in plain English. VERDICT compiles them to ZK circuits
-          and deploys on Midnight.
+        <p className="text-[11px] text-[var(--text-muted)] mt-2 tracking-wide">
+          Choose your path. Each card reveals the next step of the ritual.
         </p>
       </div>
 
-      {/* Step indicator */}
-      <div className="flex items-center gap-0 mb-6">
-        {[1, 2, 3].map((s) => (
-          <div key={s} className="flex items-center gap-0">
-            <span
-              className={`w-6 h-6 flex items-center justify-center text-[10px] font-bold border ${
-                step >= s
-                  ? "border-white text-white"
-                  : "border-[var(--border)] text-[var(--text-muted)]"
-              }`}
-            >
-              {step > s ? "✓" : s}
-            </span>
-            <span
-              className={`text-[10px] uppercase tracking-wider mx-2 ${
-                step >= s
-                  ? "text-[var(--text-secondary)]"
-                  : "text-[var(--text-muted)]"
-              }`}
-            >
-              {s === 1 ? "Define" : s === 2 ? "Review" : "Deploy"}
-            </span>
-            {s < 3 && (
-              <span className="inline-block w-8 border-t border-dashed border-[var(--border-bright)]" />
-            )}
-          </div>
-        ))}
-      </div>
+      {/* Tarot Cards */}
+      <div className="flex items-center justify-center gap-6">
+        {tarotCards.map((card) => {
+          const isActive =
+            card.n === 1 ||
+            (card.n === 2 && compact !== "") ||
+            (card.n === 3 && deployResult !== null);
+          const isCompleted =
+            (card.n === 1 && rules !== "") ||
+            (card.n === 2 && compact !== "") ||
+            (card.n === 3 && deployResult !== null);
 
-      {/* Two-column layout: input left, output right */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Left column — input */}
-        <div className="space-y-4">
-          {/* Rule input */}
-          <div className="panel corner-frame">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border)]">
-              <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                Rules · English
-              </span>
-              <span className="text-[10px] text-[var(--text-muted)]">
-                {rules.trim().split("\n").filter(Boolean).length} rules
-              </span>
-            </div>
-            <textarea
-              value={rules}
-              onChange={(e) => setRules(e.target.value)}
-              className="w-full bg-transparent p-4 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none outline-none h-48 font-mono"
-              placeholder={`Players cannot move faster than 5 units per tick\nCards must be in the player's hand before playing\nRNG must be committed before the bet is placed\nNo action can exceed 10 per second`}
-            />
-          </div>
+          return (
+            <button
+              key={card.n}
+              onClick={() => {
+                if (card.n === 1) setModal(1);
+                else if (card.n === 2 && compact) setModal(2);
+                else if (card.n === 3 && deployResult) setModal(3);
+                else setModal(1);
+              }}
+              className={`group relative cursor-pointer transition-all duration-500 ${
+                isActive
+                  ? "hover:-translate-y-3 hover:shadow-[0_20px_60px_rgba(0,255,65,0.1)]"
+                  : "opacity-30 hover:opacity-50"
+              }`}
+              style={{ width: 220, height: 340 }}
+            >
+              {/* Card border — double line like real tarot */}
+              <div
+                className="absolute inset-0 border border-[var(--border-bright)] transition-colors duration-500 group-hover:border-[var(--accent)]"
+                style={{ background: "var(--bg-secondary)" }}
+              />
+              {/* Inner border */}
+              <div className="absolute inset-[6px] border border-[var(--border)] group-hover:border-[var(--border-bright)] transition-colors duration-500" />
 
-          {/* Metadata */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="panel">
-              <div className="px-3 py-1.5 border-b border-[var(--border)]">
-                <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                  Ruleset Name
+              {/* Corner ornaments */}
+              <div className="absolute top-[10px] left-[10px] text-[8px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors">◆</div>
+              <div className="absolute top-[10px] right-[10px] text-[8px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors">◆</div>
+              <div className="absolute bottom-[10px] left-[10px] text-[8px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors rotate-180">◆</div>
+              <div className="absolute bottom-[10px] right-[10px] text-[8px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors rotate-180">◆</div>
+
+              {/* Numeral at top */}
+              <div className="absolute top-[22px] left-0 right-0 text-center">
+                <span className="text-[11px] tracking-[0.3em] text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors">
+                  {card.numeral}
                 </span>
               </div>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none font-mono"
-                placeholder="my-ruleset"
-              />
-            </div>
-            <div className="panel">
-              <div className="px-3 py-1.5 border-b border-[var(--border)]">
-                <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                  Category
+
+              {/* Decorative top line */}
+              <div className="absolute top-[38px] left-[20px] right-[20px] flex items-center gap-2 opacity-30">
+                <div className="flex-1 h-px bg-current text-[var(--border-bright)]" />
+                <span className="text-[6px] text-[var(--border-bright)]">✦</span>
+                <div className="flex-1 h-px bg-current text-[var(--border-bright)]" />
+              </div>
+
+              {/* Symbol — center of card */}
+              <div className={`absolute top-[55px] left-0 right-0 transition-colors duration-500 ${
+                isCompleted ? "text-[var(--accent)]" : "text-[var(--border-bright)] group-hover:text-[var(--text-secondary)]"
+              }`}>
+                {card.symbol}
+              </div>
+
+              {/* Decorative bottom line */}
+              <div className="absolute bottom-[120px] left-[20px] right-[20px] flex items-center gap-2 opacity-30">
+                <div className="flex-1 h-px bg-current text-[var(--border-bright)]" />
+                <span className="text-[6px] text-[var(--border-bright)]">✦</span>
+                <div className="flex-1 h-px bg-current text-[var(--border-bright)]" />
+              </div>
+
+              {/* Title */}
+              <div className="absolute bottom-[80px] left-0 right-0 text-center">
+                <span className="text-[13px] uppercase tracking-[0.2em] text-[var(--text-primary)] font-bold group-hover:text-white transition-colors">
+                  {card.title}
                 </span>
               </div>
-              <input
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none font-mono"
-                placeholder="e.g. card-game, fps, moba"
-              />
-            </div>
-          </div>
-          <div className="panel">
-            <div className="px-3 py-1.5 border-b border-[var(--border)]">
-              <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                Description
-              </span>
-            </div>
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none font-mono"
-              placeholder="What does this ruleset enforce?"
-            />
-          </div>
 
-          {/* Action buttons */}
-          <div className="flex gap-3">
-            <button
-              onClick={handleCompile}
-              disabled={compiling || !rules.trim()}
-              className={`btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer ${
-                compiling || !rules.trim()
-                  ? "bg-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
-                  : "bg-white text-black hover:bg-[var(--text-primary)]"
-              }`}
-            >
-              {compiling ? "Compiling..." : "Compile to Compact"}
-            </button>
-            <button
-              onClick={handleLoadExample}
-              className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all cursor-pointer"
-            >
-              Load Example
-            </button>
-          </div>
+              {/* Label */}
+              <div className="absolute bottom-[60px] left-0 right-0 text-center">
+                <span className="text-[9px] uppercase tracking-[0.25em] text-[var(--text-muted)]">
+                  {card.label}
+                </span>
+              </div>
 
-          {/* Error */}
-          {error && (
-            <div className="px-4 py-2 border border-[var(--danger)] bg-[rgba(255,51,51,0.05)] text-xs text-[var(--danger)]">
-              {error}
-            </div>
-          )}
-        </div>
-
-        {/* Right column — compiled output */}
-        <div className="space-y-4">
-          <div className="panel corner-frame">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border)]">
-              <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                Generated Compact · Preview
-              </span>
-              {compact && (
-                <button
-                  onClick={() => navigator.clipboard.writeText(compact)}
-                  className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer"
-                >
-                  Copy
-                </button>
-              )}
-            </div>
-            {compact ? (
-              <pre className="p-4 text-xs leading-relaxed overflow-x-auto max-h-[28rem] overflow-y-auto">
-                <code>
-                  {compact.split("\n").map((line, i) => (
-                    <div key={i} className="flex">
-                      <span className="w-8 text-right pr-3 text-[var(--text-muted)] select-none shrink-0">
-                        {i + 1}
-                      </span>
-                      <span
-                        className={
-                          line.trimStart().startsWith("//")
-                            ? "text-[var(--text-muted)]"
-                            : line.includes("export") ||
-                              line.includes("pragma") ||
-                              line.includes("import")
-                            ? "text-[var(--accent-dim)]"
-                            : line.includes("assert")
-                            ? "text-[var(--warning)]"
-                            : "text-[var(--text-primary)]"
-                        }
-                      >
-                        {line || "\u00A0"}
-                      </span>
-                    </div>
-                  ))}
-                </code>
-              </pre>
-            ) : (
-              <div className="p-4 text-xs text-[var(--text-muted)] leading-relaxed min-h-[18rem] flex flex-col justify-center items-center gap-3">
-                {compiling ? (
-                  <span className="text-[var(--text-secondary)]">
-                    Translating English rules to Compact via Gemini...
+              {/* Description / status */}
+              <div className="absolute bottom-[28px] left-[16px] right-[16px] text-center">
+                {card.n === 1 && rules ? (
+                  <span className="text-[10px] text-[var(--accent-dim)] font-mono">
+                    {rules.trim().split("\n").filter(Boolean).length} rules inscribed
+                  </span>
+                ) : card.n === 2 && compact ? (
+                  <span className="text-[10px] text-[var(--accent-dim)] font-mono">
+                    {compact.split("\n").length} lines revealed
+                  </span>
+                ) : card.n === 3 && deployResult ? (
+                  <span className="text-[10px] text-[var(--accent)] font-mono">
+                    ✦ SEALED ✦
                   </span>
                 ) : (
-                  <>
-                    <div className="text-[var(--border-bright)] text-2xl mb-1">◈</div>
-                    <span className="text-[var(--text-muted)] text-center">
-                      Write rules on the left and compile<br />to see generated Compact code here
-                    </span>
-                    <div className="mt-2 text-[var(--text-muted)] opacity-60 text-[10px] font-mono">
-                      pragma language_version 0.21;
-                    </div>
-                  </>
+                  <span className="text-[10px] text-[var(--text-muted)] leading-relaxed">
+                    {card.desc}
+                  </span>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Deploy button — only after compile */}
-          {compact && step >= 2 && !deployResult && (
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleDeploy}
-                disabled={deploying || !name.trim()}
-                className={`btn-brutal px-5 py-2.5 text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer ${
-                  deploying || !name.trim()
-                    ? "bg-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
-                    : "bg-white text-black hover:bg-[var(--text-primary)]"
-                }`}
-              >
-                {deploying ? "Deploying..." : "Deploy to Midnight"}
-              </button>
-              <button
-                onClick={() => {
-                  setCompact("");
-                  setStep(1);
-                  setDeployResult(null);
+              {/* Glow effect on hover */}
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
+                style={{
+                  background: "radial-gradient(ellipse at center, rgba(0,255,65,0.04) 0%, transparent 70%)",
                 }}
-                className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all cursor-pointer"
-              >
-                Edit Rules
-              </button>
-              {!name.trim() && (
-                <span className="text-[10px] text-[var(--warning)] uppercase tracking-wider">
-                  Name required
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+              />
+            </button>
+          );
+        })}
       </div>
 
-      {/* Deploy result — full width below */}
-      {deployResult && (
-        <div className="mt-6 corner-frame corner-frame-accent border border-[var(--accent)] bg-[var(--accent-glow)] relative">
-          <div className="px-4 py-2.5 border-b border-[var(--accent)]">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--accent)] font-bold">
-              Deployed Successfully
-            </span>
+      {/* Action row */}
+      <div className="mt-8 flex items-center justify-center gap-4">
+        <button
+          onClick={() => setModal(1)}
+          className="btn-brutal px-5 py-2.5 text-[11px] uppercase tracking-[0.15em] font-bold bg-white text-black hover:bg-[var(--text-primary)] transition-all cursor-pointer"
+        >
+          Begin Ritual
+        </button>
+        {deployResult && (
+          <button
+            onClick={resetAll}
+            className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all cursor-pointer"
+          >
+            Reset
+          </button>
+        )}
+      </div>
+
+      {/* ═══════ PAST RULESETS — TAROT COLLECTION ═══════ */}
+      {rulesets.length > 0 && (
+        <div className="mt-14">
+          {/* Section divider */}
+          <div className="flex items-center gap-4 mb-8">
+            <div className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg, var(--border-bright) 0 2px, transparent 2px 6px)" }} />
+            <span className="text-[10px] uppercase tracking-[0.3em] text-[var(--text-muted)]">✦ Your Rulesets ✦</span>
+            <div className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg, var(--border-bright) 0 2px, transparent 2px 6px)" }} />
           </div>
-          <div className="p-4 space-y-3">
-            <div className="grid grid-cols-4 gap-3">
-              {[
-                { label: "CONTRACT", value: deployResult.contractAddress },
-                { label: "TX HASH", value: deployResult.txHash },
-                { label: "NETWORK", value: deployResult.network },
-                { label: "DEPLOYED AT", value: new Date(deployResult.deployedAt).toLocaleString() },
-              ].map((item) => (
-                <div key={item.label}>
-                  <span className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider block mb-0.5">
-                    {item.label}
-                  </span>
-                  <span className="text-[11px] text-[var(--text-primary)] font-mono break-all">
-                    {item.value}
-                  </span>
+
+          {/* 3-per-row grid */}
+          <div className="grid grid-cols-3 gap-5">
+            {rulesets.map((rs, idx) => {
+              const categorySymbols: Record<string, string> = {
+                fps: "⊕",
+                "card-game": "♠",
+                mmorpg: "⚔",
+                "turn-based": "♟",
+                casino: "♦",
+                "battle-royale": "◎",
+              };
+              const sym = categorySymbols[rs.category] || "◈";
+              const romanNumerals = ["IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
+              const numeral = romanNumerals[idx % romanNumerals.length];
+
+              return (
+                <div
+                  key={rs.address}
+                  className="group relative cursor-default transition-all duration-500 hover:-translate-y-2"
+                  style={{ height: 280 }}
+                >
+                  {/* Outer border */}
+                  <div className="absolute inset-0 border border-[var(--border)] group-hover:border-[var(--accent-dim)] transition-colors duration-500" style={{ background: "var(--bg-secondary)" }} />
+                  {/* Inner border */}
+                  <div className="absolute inset-[5px] border border-[var(--border)] group-hover:border-[var(--border-bright)] transition-colors duration-500" />
+
+                  {/* Corner ornaments */}
+                  <div className="absolute top-[8px] left-[8px] text-[6px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors">◆</div>
+                  <div className="absolute top-[8px] right-[8px] text-[6px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors">◆</div>
+                  <div className="absolute bottom-[8px] left-[8px] text-[6px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors rotate-180">◆</div>
+                  <div className="absolute bottom-[8px] right-[8px] text-[6px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors rotate-180">◆</div>
+
+                  {/* Numeral */}
+                  <div className="absolute top-[18px] left-0 right-0 text-center">
+                    <span className="text-[9px] tracking-[0.3em] text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors">{numeral}</span>
+                  </div>
+
+                  {/* Top divider */}
+                  <div className="absolute top-[32px] left-[14px] right-[14px] flex items-center gap-1.5 opacity-25">
+                    <div className="flex-1 h-px bg-[var(--border-bright)]" />
+                    <span className="text-[5px] text-[var(--border-bright)]">✦</span>
+                    <div className="flex-1 h-px bg-[var(--border-bright)]" />
+                  </div>
+
+                  {/* Category symbol — large center */}
+                  <div className="absolute top-[50px] left-0 right-0 text-center text-[var(--border-bright)] group-hover:text-[var(--accent)] transition-colors duration-500">
+                    <span className="text-3xl">{sym}</span>
+                  </div>
+
+                  {/* Category tag */}
+                  <div className="absolute top-[95px] left-0 right-0 text-center">
+                    <span className="text-[8px] uppercase tracking-[0.2em] text-[var(--text-muted)]">{rs.category}</span>
+                  </div>
+
+                  {/* Bottom divider */}
+                  <div className="absolute bottom-[115px] left-[14px] right-[14px] flex items-center gap-1.5 opacity-25">
+                    <div className="flex-1 h-px bg-[var(--border-bright)]" />
+                    <span className="text-[5px] text-[var(--border-bright)]">✦</span>
+                    <div className="flex-1 h-px bg-[var(--border-bright)]" />
+                  </div>
+
+                  {/* Name */}
+                  <div className="absolute bottom-[85px] left-[14px] right-[14px] text-center">
+                    <span className="text-[11px] uppercase tracking-[0.1em] text-[var(--text-primary)] font-bold group-hover:text-white transition-colors leading-tight block">
+                      {rs.name.length > 28 ? rs.name.slice(0, 28) + "..." : rs.name}
+                    </span>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="absolute bottom-[50px] left-[14px] right-[14px] space-y-1">
+                    <div className="flex justify-between px-1">
+                      <span className="text-[8px] text-[var(--text-muted)] uppercase tracking-wider">Checks</span>
+                      <span className="text-[8px] text-[var(--text-secondary)] font-mono">{rs.totalChecks?.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between px-1">
+                      <span className="text-[8px] text-[var(--text-muted)] uppercase tracking-wider">Flagged</span>
+                      <span className="text-[8px] text-[var(--danger)] font-mono">{rs.flaggedRate}</span>
+                    </div>
+                  </div>
+
+                  {/* Status seal */}
+                  <div className="absolute bottom-[26px] left-0 right-0 text-center">
+                    <span className="text-[8px] tracking-[0.25em] uppercase text-[var(--accent-dim)] group-hover:text-[var(--accent)] transition-colors">
+                      ✦ sealed ✦
+                    </span>
+                  </div>
+
+                  {/* Hover glow */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" style={{ background: "radial-gradient(ellipse at center, rgba(0,255,65,0.04) 0%, transparent 70%)" }} />
                 </div>
-              ))}
-            </div>
-
-            <div className="dither-sep" />
-
-            <div>
-              <span className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider block mb-1.5">
-                SDK SNIPPET
-              </span>
-              <pre className="text-xs text-[var(--text-primary)] leading-relaxed bg-[var(--bg-primary)] p-3 border border-[var(--border)]">
-                {deployResult.sdk}
-              </pre>
-            </div>
-
-            <button
-              onClick={() => {
-                setRules("");
-                setName("");
-                setCategory("");
-                setDescription("");
-                setCompact("");
-                setStep(1);
-                setDeployResult(null);
-                setError("");
-              }}
-              className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all cursor-pointer"
-            >
-              Deploy Another
-            </button>
+              );
+            })}
           </div>
+        </div>
+      )}
+
+      {/* ═══════ MODAL OVERLAY ═══════ */}
+      {modal > 0 && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{
+            transition: "background 0.35s ease",
+            background: modalVisible
+              ? "rgba(0, 0, 0, 0.85)"
+              : "rgba(0, 0, 0, 0)",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !transitioning) closeModal();
+          }}
+        >
+          {/* ── MODAL 1: DEFINE ── */}
+          {modal === 1 && (
+            <div
+              className="relative w-full max-w-2xl mx-4"
+              style={{
+                transition:
+                  "opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
+                opacity: modalVisible ? 1 : 0,
+                transform: modalVisible
+                  ? "translateY(0) scale(1)"
+                  : "translateY(24px) scale(0.97)",
+              }}
+            >
+              {/* Corner accents */}
+              <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-[var(--accent)]" />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-[var(--accent)]" />
+
+              <div className="border border-[var(--border-bright)] bg-[var(--bg-primary)]">
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 flex items-center justify-center text-[10px] font-bold border border-white text-white">
+                      1
+                    </span>
+                    <span className="text-[11px] uppercase tracking-[0.15em] text-white font-bold">
+                      Define Rules
+                    </span>
+                  </div>
+                  <button
+                    onClick={closeModal}
+                    className="text-[var(--text-muted)] hover:text-white text-xs cursor-pointer transition-colors"
+                  >
+                    ESC
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-5 space-y-4">
+                  {/* Rules textarea */}
+                  <div className="border border-[var(--border)] bg-[var(--bg-secondary)]">
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border)]">
+                      <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                        Rules · English
+                      </span>
+                      <span className="text-[10px] text-[var(--text-muted)]">
+                        {rules.trim().split("\n").filter(Boolean).length} rules
+                      </span>
+                    </div>
+                    <textarea
+                      value={rules}
+                      onChange={(e) => setRules(e.target.value)}
+                      className="w-full bg-transparent p-4 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none outline-none h-44 font-mono"
+                      placeholder={`Players cannot move faster than 5 units per tick\nCards must be in the player's hand before playing\nRNG must be committed before the bet is placed`}
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* Metadata row */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="border border-[var(--border)] bg-[var(--bg-secondary)]">
+                      <div className="px-3 py-1.5 border-b border-[var(--border)]">
+                        <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                          Ruleset Name
+                        </span>
+                      </div>
+                      <input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none font-mono"
+                        placeholder="my-ruleset"
+                      />
+                    </div>
+                    <div className="border border-[var(--border)] bg-[var(--bg-secondary)]">
+                      <div className="px-3 py-1.5 border-b border-[var(--border)]">
+                        <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                          Category
+                        </span>
+                      </div>
+                      <input
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        className="w-full bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none font-mono"
+                        placeholder="e.g. card-game, fps, moba"
+                      />
+                    </div>
+                  </div>
+                  <div className="border border-[var(--border)] bg-[var(--bg-secondary)]">
+                    <div className="px-3 py-1.5 border-b border-[var(--border)]">
+                      <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                        Description
+                      </span>
+                    </div>
+                    <input
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="w-full bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none font-mono"
+                      placeholder="What does this ruleset enforce?"
+                    />
+                  </div>
+
+                  {/* Error */}
+                  {error && (
+                    <div className="px-4 py-2 border border-[var(--danger)] bg-[rgba(255,51,51,0.05)] text-xs text-[var(--danger)]">
+                      {error}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--border)]">
+                  <button
+                    onClick={handleLoadExample}
+                    className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all cursor-pointer"
+                  >
+                    Load Example
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={closeModal}
+                      className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleCompile}
+                      disabled={compiling || !rules.trim()}
+                      className={`btn-brutal px-5 py-2.5 text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer ${
+                        compiling || !rules.trim()
+                          ? "bg-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
+                          : "bg-white text-black hover:bg-[var(--text-primary)]"
+                      }`}
+                    >
+                      {compiling ? (
+                        <span className="flex items-center gap-2">
+                          <span className="inline-block w-3 h-3 border border-black border-t-transparent rounded-full animate-spin" />
+                          Compiling...
+                        </span>
+                      ) : (
+                        "Compile →"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── MODAL 2: REVIEW ── */}
+          {modal === 2 && (
+            <div
+              className="relative w-full max-w-3xl mx-4"
+              style={{
+                transition:
+                  "opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
+                opacity: modalVisible ? 1 : 0,
+                transform: modalVisible
+                  ? "translateY(0) scale(1)"
+                  : "translateY(24px) scale(0.97)",
+              }}
+            >
+              <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-[var(--warning)]" />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-[var(--warning)]" />
+
+              <div className="border border-[var(--border-bright)] bg-[var(--bg-primary)]">
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 flex items-center justify-center text-[10px] font-bold border border-[var(--warning)] text-[var(--warning)]">
+                      2
+                    </span>
+                    <span className="text-[11px] uppercase tracking-[0.15em] text-white font-bold">
+                      Review Compact
+                    </span>
+                    <span className="text-[10px] text-[var(--text-muted)] ml-2">
+                      {compact.split("\n").length} lines
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {compact && (
+                      <button
+                        onClick={() => navigator.clipboard.writeText(compact)}
+                        className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer"
+                      >
+                        Copy
+                      </button>
+                    )}
+                    <button
+                      onClick={closeModal}
+                      className="text-[var(--text-muted)] hover:text-white text-xs cursor-pointer transition-colors"
+                    >
+                      ESC
+                    </button>
+                  </div>
+                </div>
+
+                {/* Code body */}
+                <div className="p-0">
+                  <pre className="p-5 text-xs leading-relaxed overflow-x-auto max-h-[50vh] overflow-y-auto">
+                    <code>
+                      {compact.split("\n").map((line, i) => (
+                        <div key={i} className="flex hover:bg-[var(--bg-hover)] transition-colors">
+                          <span className="w-8 text-right pr-3 text-[var(--text-muted)] select-none shrink-0">
+                            {i + 1}
+                          </span>
+                          <span
+                            className={
+                              line.trimStart().startsWith("//")
+                                ? "text-[var(--text-muted)]"
+                                : line.includes("export") ||
+                                  line.includes("pragma") ||
+                                  line.includes("import")
+                                ? "text-[var(--accent-dim)]"
+                                : line.includes("assert")
+                                ? "text-[var(--warning)]"
+                                : "text-[var(--text-primary)]"
+                            }
+                          >
+                            {line || "\u00A0"}
+                          </span>
+                        </div>
+                      ))}
+                    </code>
+                  </pre>
+                </div>
+
+                {/* Source rules summary */}
+                <div className="px-5 py-3 border-t border-[var(--border)] bg-[var(--bg-secondary)]">
+                  <span className="text-[9px] uppercase tracking-wider text-[var(--text-muted)] block mb-1">
+                    Source Rules
+                  </span>
+                  <p className="text-[11px] text-[var(--text-secondary)] font-mono leading-relaxed">
+                    {rules
+                      .trim()
+                      .split("\n")
+                      .filter(Boolean)
+                      .map((r, i) => `${i + 1}. ${r}`)
+                      .join(" · ")}
+                  </p>
+                </div>
+
+                {/* Error */}
+                {error && (
+                  <div className="mx-5 mb-3 px-4 py-2 border border-[var(--danger)] bg-[rgba(255,51,51,0.05)] text-xs text-[var(--danger)]">
+                    {error}
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--border)]">
+                  <button
+                    onClick={() => transitionTo(1)}
+                    className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all cursor-pointer"
+                  >
+                    ← Edit Rules
+                  </button>
+                  <div className="flex items-center gap-3">
+                    {!name.trim() && (
+                      <span className="text-[10px] text-[var(--warning)] uppercase tracking-wider">
+                        Name required
+                      </span>
+                    )}
+                    <button
+                      onClick={handleDeploy}
+                      disabled={deploying || !name.trim()}
+                      className={`btn-brutal px-5 py-2.5 text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer ${
+                        deploying || !name.trim()
+                          ? "bg-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
+                          : "bg-white text-black hover:bg-[var(--text-primary)]"
+                      }`}
+                    >
+                      {deploying ? (
+                        <span className="flex items-center gap-2">
+                          <span className="inline-block w-3 h-3 border border-black border-t-transparent rounded-full animate-spin" />
+                          Deploying...
+                        </span>
+                      ) : (
+                        "Deploy to Midnight →"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── MODAL 3: DEPLOY RESULT ── */}
+          {modal === 3 && deployResult && (
+            <div
+              className="relative w-full max-w-2xl mx-4"
+              style={{
+                transition:
+                  "opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
+                opacity: modalVisible ? 1 : 0,
+                transform: modalVisible
+                  ? "translateY(0) scale(1)"
+                  : "translateY(24px) scale(0.97)",
+              }}
+            >
+              <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-[var(--accent)]" />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-[var(--accent)]" />
+
+              <div
+                className="border border-[var(--accent)] bg-[var(--bg-primary)]"
+                style={{
+                  boxShadow: "0 0 60px rgba(0, 255, 65, 0.08), 0 0 120px rgba(0, 255, 65, 0.04)",
+                }}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--accent)] bg-[var(--accent-glow)]">
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 flex items-center justify-center text-[10px] font-bold border border-[var(--accent)] text-[var(--accent)]">
+                      ✓
+                    </span>
+                    <span className="text-[11px] uppercase tracking-[0.15em] text-[var(--accent)] font-bold">
+                      Deployed Successfully
+                    </span>
+                  </div>
+                  <button
+                    onClick={closeModal}
+                    className="text-[var(--text-muted)] hover:text-white text-xs cursor-pointer transition-colors"
+                  >
+                    ESC
+                  </button>
+                </div>
+
+                {/* Details */}
+                <div className="p-5 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    {[
+                      { label: "CONTRACT", value: deployResult.contractAddress },
+                      { label: "TX HASH", value: deployResult.txHash },
+                      { label: "NETWORK", value: deployResult.network },
+                      {
+                        label: "DEPLOYED AT",
+                        value: new Date(
+                          deployResult.deployedAt
+                        ).toLocaleString(),
+                      },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        className="border border-[var(--border)] bg-[var(--bg-secondary)] p-3"
+                      >
+                        <span className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider block mb-1">
+                          {item.label}
+                        </span>
+                        <span className="text-[11px] text-[var(--text-primary)] font-mono break-all">
+                          {item.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="dither-sep" />
+
+                  {/* SDK Snippet */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider">
+                        SDK SNIPPET
+                      </span>
+                      <button
+                        onClick={() =>
+                          navigator.clipboard.writeText(deployResult.sdk)
+                        }
+                        className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <pre className="text-xs text-[var(--text-primary)] leading-relaxed bg-[var(--bg-secondary)] p-4 border border-[var(--border)] max-h-48 overflow-y-auto">
+                      {deployResult.sdk}
+                    </pre>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--border)]">
+                  <button
+                    onClick={() => transitionTo(2)}
+                    className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all cursor-pointer"
+                  >
+                    ← View Code
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={closeModal}
+                      className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-all cursor-pointer"
+                    >
+                      Close
+                    </button>
+                    <button
+                      onClick={resetAll}
+                      className="btn-brutal px-5 py-2.5 text-[11px] uppercase tracking-wider font-bold bg-white text-black hover:bg-[var(--text-primary)] transition-all cursor-pointer"
+                    >
+                      Deploy Another
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
