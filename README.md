@@ -1,62 +1,34 @@
 # VERDICT
 
-### *Every system that enforces rules asks you to trust it. We replace trust with proof.*
+### *Verdict doesn't ask systems to be honest. It makes dishonesty mathematically impossible.*
 
-**Universal Zero-Knowledge Rule Enforcement Protocol on Midnight**
-
----
-
-## The World Today
-
-To prove you followed the rules, you must show everything.
-
-Financial audits open your books. KYC hands over your identity. Anti-cheat scans your entire machine at kernel level. Platform integrity logs every action you take. Compliance in every industry works the same way: **surveillance in exchange for trust**.
-
-170 million gamers have kernel-level anti-cheat watching their machines. Every regulated business opens its data to auditors. Every marketplace participant trusts the platform to be fair. The pattern is universal — and universally broken.
-
-The cost of compliance is privacy. The cost of privacy is non-compliance. There has never been a third option.
+**Universal Zero-Knowledge Integrity Protocol on Midnight**
 
 ---
 
-## The Verification Trilemma
+## The Problem
 
-Any system with rules faces a fundamental problem:
+Every day, you interact with systems that enforce rules you cannot verify.
 
-```
-        COMPLIANCE
-           /\
-          /  \
-         /    \
-        /      \
- PRIVACY ────── TRUST
-```
+Your insurance claim — processed by an algorithm you can't inspect. Your trade on an exchange — executed at a price you have to trust. Your loan application — scored by a model that won't show its math. Your game — adjudicated by a server that could be lying about every outcome.
 
-**Pick two.** You've never been able to have all three.
+These aren't edge cases. This is the default. Every platform, every service, every institution that processes your data runs the same architecture: a black box that takes your inputs, applies rules internally, and tells you what happened. You have no proof the rules were followed. None.
 
-- **Compliance + Trust, no privacy** — Today's world. You prove you followed the rules by exposing everything to a verifier you trust.
-- **Compliance + Privacy, no trust** — You prove compliance without revealing data. But who checks? A server you must trust. Defeating the point.
-- **Privacy + Trust, no compliance** — The honor system. Nobody actually checks. Fraud, cheating, and manipulation run free.
+**The entity enforcing the rules is often the same entity that profits from breaking them.**
 
-**VERDICT resolves the trilemma.** Zero-knowledge proofs give you compliance + privacy. A blockchain gives you trustless verification. All three. Simultaneously. For any rule-based system.
+There is zero cryptographic proof that any rule was ever applied correctly. You're trusting a `console.log` on someone else's server.
+
+That's not integrity. That's faith.
 
 ---
 
 ## What Is VERDICT?
 
-VERDICT is a **protocol for universal rule enforcement**.
+VERDICT is a universal ZK integrity protocol built on Midnight. It doesn't replace existing systems. It doesn't touch business logic. It sits underneath and asks one question: **was this state transition valid?**
 
-Any system with rules — games, financial platforms, supply chains, governance, marketplaces — can deploy a ruleset. VERDICT proves every state transition follows those rules, without revealing the underlying data.
+Every state transition is checked by a ZK circuit. 10 mathematical checks per transition. Bounds validation, action legitimacy, behavioral entropy, commit-reveal verification — the works. The result is either **CLEAN** or **FLAGGED**. Not an accusation — a **proof**. Immutable, on-chain, verifiable by anyone.
 
-The verifier learns exactly one thing: **VALID** or **FLAGGED**. Nothing else. Not the data, not the strategy, not the identity. Just whether the rules were followed.
-
-### How It Works
-
-1. **Define rules** — Write what constitutes valid behavior, in plain English
-2. **Deploy** — Rules compile into a zero-knowledge circuit and deploy on-chain
-3. **Verify** — Participants submit state transitions; the circuit proves compliance privately
-4. **Settle** — Cryptographic proof lands on Midnight; anyone can audit the verdict, nobody can see the data
-
-The system being verified never pauses. Proof generation runs in the background. Settlement is asynchronous. Violations are flagged retroactively — but the proof is cryptographically undeniable and permanently on-chain.
+What makes this a protocol and not a product: every system gets its own ruleset. Insurance claim processing, exchange trade execution, game anti-cheat, lending compliance — each one is a deployed Compact contract on Midnight. Different rules, same verification engine. You don't build a new system per use case. You deploy a ruleset.
 
 ### Where This Applies
 
@@ -71,13 +43,11 @@ VERDICT is domain-agnostic. Any system where participants must follow rules but 
 | **Marketplace integrity** | Bids and listings follow platform rules | Bidder identity, amounts, strategy |
 | **IoT & sensor networks** | Readings fall within valid ranges and sequences | Raw sensor data, device locations |
 
-The reference implementation uses gaming — the most adversarial rule-enforcement environment there is. If VERDICT can catch aimbots and wallhacks without seeing the game, it can verify anything.
-
 ---
 
 ## The 10 Checks
 
-Every state transition runs through 10 layered integrity checks. Each targets a different class of rule violation. All run simultaneously inside a single zero-knowledge proof.
+Every state transition runs through 10 layered integrity checks inside a single zero-knowledge proof. ~940 constraints. Lightweight enough for real-time settlement.
 
 | # | Check | What It Catches |
 |---|-------|-----------------|
@@ -101,25 +71,35 @@ Four violation classes:
 
 ---
 
-## The SDK
+## Deploy — The Developer Story
 
-Two lines to integrate. Any system. Any language.
+Write rules in plain English. Hit compile. Verdict translates them into a Compact ZK circuit — Midnight's native language — validates the syntax, and gives you a deployable contract.
 
-```typescript
-import { Verdict } from "verdict-sdk";
-
-const verdict = new Verdict("mid1_your_ruleset_address");
-const result = await verdict.verify({
-  prevState: previousState,
-  currState: currentState,
-  action: actionPerformed,
-});
-
-// result.verdict → "VALID" or "FLAGGED"
-// result.details → per-check breakdown
+```
+"Claim payouts must match the policy tier."
+"Trade execution price cannot deviate more than 0.1% from quoted price."
+"Player health cannot go below zero."
 ```
 
-Also available in Python, Rust, and Go. The SDK handles proof generation, on-chain settlement, and returns a cryptographically verified verdict. Your application never touches the blockchain directly.
+That compiles to real Compact. Pragma 0.22. Runs inside Midnight's ZK prover. The system under verification never sees the private data. The circuit sees **witnesses** — private inputs that get verified and discarded. That's the Midnight primitive doing what it was built for.
+
+From writing English rules to a live ZK verification endpoint. One workflow.
+
+---
+
+## Integrate — Three Lines of Code
+
+```typescript
+import { Verdict } from '@verdict/sdk'
+const verdict = new Verdict('midnight1_abc123...')
+const result = await verdict.verify({ prevState, currState, action })
+```
+
+Your system captures a state transition. The SDK submits it as a ZK witness — **private by default**. The circuit runs 10 checks. The proof settles on Midnight. You get back CLEAN or FLAGGED.
+
+The user's data, the internal state, the business logic — none of it is ever revealed. Not to you, not to anyone.
+
+TypeScript, Python, Rust, Go. Pick your stack. Plug in the address. You're done.
 
 ---
 
@@ -127,23 +107,50 @@ Also available in Python, Rust, and Go. The SDK handles proof generation, on-cha
 
 VERDICT ships with a protocol dashboard — not a demo.
 
-**Deploy** — Write enforcement rules in plain English. They compile into a zero-knowledge circuit and deploy on-chain. You get back a contract address and a SDK snippet. No ZK knowledge required.
+| Page | What It Does |
+|------|-------------|
+| **Overview** | Real-time protocol health — rulesets deployed, verifications flowing, proofs settling |
+| **Deploy** | Write enforcement rules in plain English, compile to Compact, deploy on-chain |
+| **Explore** | Browse every deployed ruleset on the network — live feeds, flagged rates, integrity scores |
+| **Explore/[id]** | Public integrity profile per ruleset — total verifications, flagged rate, all on-chain, all auditable |
+| **Integrate** | Pick a ruleset, pick a language, copy the snippet |
 
-**Explore** — Browse every deployed ruleset on the network. See live verification feeds, flagged rates, and stats for any ruleset.
-
-**Integrate** — Pick a ruleset, pick a language, copy the snippet. Four steps: Capture, Submit, Prove, Settle.
-
-**Overview** — Real-time protocol health. Rulesets deployed, verifications flowing, proofs settling.
+No more trusting platforms when they say "we follow the rules." Show me the proof. Literally.
 
 ---
 
-## Why Midnight?
+## Tech Stack
 
-VERDICT needs a chain where privacy is native, not bolted on.
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | Next.js 16, React 19, TypeScript 5, Tailwind CSS 4 |
+| **ZK Circuit** | Compact (Midnight), @midnight-ntwrk/compact-runtime |
+| **Blockchain** | Midnight (ledger v7) |
+| **Proof Generation** | Midnight proof-server |
+| **Wallet** | @midnight-ntwrk/wallet-sdk |
+| **AI Compilation** | Google Gemini (English to Compact) |
+| **Infrastructure** | Docker Compose (node + indexer + proof-server) |
+| **Testing** | Vitest |
 
-Midnight's dual-ledger model keeps aggregate verdicts public (anyone can audit) while all participant data stays private (only the prover ever sees it). The ZK circuit bridges the two: takes private inputs, produces public outputs, proves the relationship without revealing anything.
+---
 
-Remove Midnight and you're back to trusting a centralized verifier — which is the problem VERDICT exists to solve.
+## Project Structure
+
+```
+ratri/
+├── verdict/                  # Next.js protocol dashboard
+│   ├── src/app/              # Pages + API routes
+│   ├── src/lib/              # Midnight simulator, Compact validator, Gemini integration
+│   └── sdk/                  # Verdict SDK (TypeScript)
+├── contract/                 # ZK circuit + Midnight JS wrapper
+│   ├── src/verdict.compact   # THE circuit — 10 checks, ~940 constraints
+│   └── src/managed/          # Compiled ZK IR, prover/verifier keys
+├── counter-cli/              # Midnight CLI + Docker orchestration
+│   ├── standalone.yml        # Docker Compose: node + indexer + proof-server
+│   └── src/standalone.ts     # Boot local Midnight stack
+├── start.sh                  # One-command startup
+└── README.md
+```
 
 ---
 
@@ -157,37 +164,34 @@ bash start.sh
 
 This starts the local Midnight stack (node, indexer, proof server) and the dashboard on `localhost:3000`.
 
+For development without Docker (simulator mode):
+
+```bash
+cd verdict
+npm run dev
+```
+
+The simulator runs the full ZK circuit in-memory with pre-seeded example rulesets — no external infrastructure required.
+
+---
+
+## Why Midnight?
+
+VERDICT needs a chain where privacy is native, not bolted on.
+
+Midnight's dual-ledger model keeps aggregate verdicts public (anyone can audit) while all participant data stays private (only the prover ever sees it). The ZK circuit bridges the two: takes private inputs, produces public outputs, proves the relationship without revealing anything.
+
+Remove Midnight and you're back to trusting a centralized verifier — which is the problem VERDICT exists to solve.
+
 ---
 
 ## The Hard Problems We Solved
 
-### The Privacy Paradox
+**The Privacy Paradox** — Rule enforcement traditionally works by *seeing everything*. VERDICT works by *seeing nothing*. You hash hidden state, verify the hash on-chain, and check for statistical correlation *inside* the zero-knowledge circuit. The verifier never learns what the data was. They only learn whether the rules were followed.
 
-Rule enforcement traditionally works by *seeing everything*. Auditors see your books. Anti-cheat scans your machine. VERDICT works by *seeing nothing*.
+**ZK Circuit Design Under Constraints** — Zero-knowledge circuits can't do everything a normal program can. No square roots. No floating point. No dynamic loops. Every check had to be redesigned for finite field arithmetic — Manhattan distance instead of Euclidean, cross products instead of angles, squared comparisons instead of roots. The result: 10 checks in ~940 constraints.
 
-How do you detect that someone is acting on hidden information — when you don't have access to the hidden information either? How do you verify a state transition is valid without seeing the state?
-
-The answer is mathematical: you don't need to see the data to verify it follows the rules. You hash hidden state, verify the hash on-chain, and check for statistical correlation *inside* the zero-knowledge circuit. The verifier never learns what the data was. They only learn whether the rules were followed.
-
-### Building on a Bleeding-Edge Chain
-
-Midnight's Compact language is powerful but barely documented. The tooling is young. Version mismatches between proof server and runtime produce silent failures. The testnet faucet rejected valid addresses. Every discovery was hard-won — from integer underflow behavior to mandatory privacy-disclosure semantics for on-chain state.
-
-We built a complete local simulator so the entire proof flow works end-to-end without depending on external infrastructure. The circuit compiles. All 10 checks pass. The protocol works.
-
-### ZK Circuit Design Under Constraints
-
-Zero-knowledge circuits can't do everything a normal program can. No square roots. No floating point. No dynamic loops. Every check in VERDICT had to be redesigned for finite field arithmetic — Manhattan distance instead of Euclidean, cross products instead of angles, squared comparisons instead of roots. The result: 10 checks in ~940 constraints. Lightweight enough for real-time settlement.
-
----
-
-## Why This Matters
-
-Every industry that enforces rules today faces the same trade-off: **compliance requires surveillance**. There has never been a way to prove you followed the rules without showing your hand.
-
-VERDICT is that way. Deploy your rules. Let participants prove compliance without revealing their data. Settle the proof on-chain so no single party controls verification.
-
-No surveillance. No data exposure. No trust required. Just a proof.
+**Building on a Bleeding-Edge Chain** — Midnight's Compact language is powerful but barely documented. The tooling is young. We built a complete local simulator so the entire proof flow works end-to-end without depending on external infrastructure.
 
 ---
 
