@@ -2,69 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const EXAMPLE_PRESETS: { label: string; name: string; category: string; description: string; rules: string }[] = [
-  {
-    label: "FPS Integrity",
-    name: "fps-movement-rules",
-    category: "fps",
-    description: "Movement and action integrity checks for FPS games",
-    rules: `Players cannot move faster than 5 units per tick
+const EXAMPLE_RULES = `Players cannot move faster than 5 units per tick
 Cards must be in the player's hand before playing
 RNG must be committed before the bet is placed
 No action can exceed 10 per second
-Position must stay within map bounds (0-1000)`,
-  },
-  {
-    label: "Sealed Auction",
-    name: "sealed-auction-integrity",
-    category: "auction",
-    description: "ZK verification for sealed-bid auction fairness",
-    rules: `Bid amount must not exceed bidder's verified balance
-Bid must be submitted before the auction deadline
-No bidder can submit more than one bid per auction
-Winning bid must be the highest among all revealed bids
-Bid commitment must match the revealed bid amount and nonce
-Reserve price must be met for the auction to be valid`,
-  },
-  {
-    label: "Token Swap",
-    name: "token-swap-rules",
-    category: "defi",
-    description: "Integrity checks for private token swap execution",
-    rules: `Input token amount must equal output amount times the exchange rate
-Slippage cannot exceed the user-specified maximum tolerance
-Total pool liquidity must be conserved after the swap
-Swap size cannot exceed 10% of the pool depth
-Minimum output amount must be respected
-Swap must execute within the specified deadline timestamp`,
-  },
-  {
-    label: "Chess Moves",
-    name: "chess-move-validator",
-    category: "board-game",
-    description: "Move legality and game state validation for chess",
-    rules: `Piece can only move according to its type's movement rules
-A move cannot leave the player's own king in check
-Castling is only valid if neither king nor rook has moved previously
-En passant capture is only valid immediately after opponent's double pawn push
-Pawn promotion must occur when a pawn reaches the last rank
-Turn must alternate between white and black players`,
-  },
-  {
-    label: "Voting System",
-    name: "private-voting-integrity",
-    category: "governance",
-    description: "Integrity checks for private ZK voting",
-    rules: `Each eligible voter can cast exactly one vote
-Vote must be for a valid candidate from the registered list
-Voter eligibility proof must match a committed voter registry
-Vote tally must equal the total number of votes cast
-Voting must occur within the designated voting period
-No vote can be changed after submission`,
-  },
-];
-
-const EXAMPLE_RULES = EXAMPLE_PRESETS[0].rules;
+Position must stay within map bounds (0-1000)`;
 
 type ModalStep = 0 | 1 | 2 | 3; // 0 = no modal, 1 = define, 2 = review, 3 = deploy result
 
@@ -88,7 +30,6 @@ export default function DeployPage() {
   const [editedCompact, setEditedCompact] = useState("");
   const [validating, setValidating] = useState(false);
   const [compileAttempts, setCompileAttempts] = useState(0);
-  const [reviewData, setReviewData] = useState<any>(null);
 
   // Fetch previously deployed rulesets
   useEffect(() => {
@@ -151,7 +92,6 @@ export default function DeployPage() {
       setCompileAttempts(data.attempts || 1);
       setNeedsHumanReview(data.needsHumanReview || false);
       setEditMode(data.needsHumanReview || false);
-      setReviewData(data.review || null);
       transitionTo(2);
     } catch (e: any) {
       setError(e.message || "Network error");
@@ -160,19 +100,11 @@ export default function DeployPage() {
     }
   }
 
-  const [showPresets, setShowPresets] = useState(false);
-
-  function handleLoadPreset(idx: number) {
-    const p = EXAMPLE_PRESETS[idx];
-    setRules(p.rules);
-    setName(p.name);
-    setCategory(p.category);
-    setDescription(p.description);
-    setShowPresets(false);
-  }
-
   function handleLoadExample() {
-    handleLoadPreset(0);
+    setRules(EXAMPLE_RULES);
+    setName("fps-movement-rules");
+    setCategory("fps");
+    setDescription("Movement and action integrity checks for FPS games");
   }
 
   async function handleDeploy() {
@@ -664,28 +596,12 @@ export default function DeployPage() {
 
                 {/* Footer */}
                 <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--border)]">
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowPresets(!showPresets)}
-                      className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all cursor-pointer"
-                    >
-                      Load Example ▾
-                    </button>
-                    {showPresets && (
-                      <div className="absolute bottom-full left-0 mb-1 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg overflow-hidden min-w-[200px] z-50 shadow-lg">
-                        {EXAMPLE_PRESETS.map((p, i) => (
-                          <button
-                            key={i}
-                            onClick={() => handleLoadPreset(i)}
-                            className="block w-full text-left px-4 py-2.5 text-[11px] tracking-wide text-[var(--text-secondary)] hover:bg-[var(--border)] hover:text-white transition-all cursor-pointer"
-                          >
-                            <span className="font-bold uppercase">{p.label}</span>
-                            <span className="block text-[10px] opacity-50 mt-0.5 normal-case">{p.description}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <button
+                    onClick={handleLoadExample}
+                    className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all cursor-pointer"
+                  >
+                    Load Example
+                  </button>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={closeModal}
@@ -815,40 +731,6 @@ export default function DeployPage() {
                 {validationErrors.length === 0 && compact && (
                   <div className="px-5 py-2 border-b border-[var(--border)] bg-[rgba(0,255,65,0.03)] text-[10px] uppercase tracking-wider text-[var(--accent)]">
                     All validation checks passed
-                  </div>
-                )}
-
-                {/* AI self-review results */}
-                {reviewData && (
-                  <div className="px-5 py-2 border-b border-[var(--border)] text-[10px]">
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="uppercase tracking-wider opacity-60">AI Review</span>
-                      <span className={`font-mono font-bold ${
-                        reviewData.score >= 8 ? "text-[var(--accent)]" : reviewData.score >= 5 ? "text-[var(--warning)]" : "text-[var(--danger)]"
-                      }`}>{reviewData.score}/10</span>
-                      <span className="opacity-40">•</span>
-                      <span className="opacity-60">{compileAttempts} iteration{compileAttempts !== 1 ? "s" : ""}</span>
-                    </div>
-                    {reviewData.issues?.filter((i: any) => i.severity === "error").length > 0 && (
-                      <div className="mt-1 space-y-0.5 text-[var(--danger)]">
-                        {reviewData.issues.filter((i: any) => i.severity === "error").map((i: any, idx: number) => (
-                          <div key={idx} className="py-0.5">{i.line ? <span className="opacity-60">L{i.line}: </span> : null}{i.description}</div>
-                        ))}
-                      </div>
-                    )}
-                    {reviewData.missingRules?.length > 0 && (
-                      <div className="mt-1 text-[var(--warning)]">
-                        <span className="opacity-60">Missing rules: </span>{reviewData.missingRules.join(", ")}
-                      </div>
-                    )}
-                    {reviewData.edgeCaseGaps?.length > 0 && (
-                      <div className="mt-1 text-[var(--danger)] opacity-80">
-                        <div className="opacity-60 mb-0.5">Unhandled edge cases:</div>
-                        {reviewData.edgeCaseGaps.map((g: string, idx: number) => (
-                          <div key={idx} className="py-0.5 pl-2">— {g}</div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 )}
 
