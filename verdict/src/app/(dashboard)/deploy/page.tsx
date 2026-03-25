@@ -24,6 +24,12 @@ export default function DeployPage() {
   const [transitioning, setTransitioning] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [rulesets, setRulesets] = useState<any[]>([]);
+  const [validationErrors, setValidationErrors] = useState<any[]>([]);
+  const [needsHumanReview, setNeedsHumanReview] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editedCompact, setEditedCompact] = useState("");
+  const [validating, setValidating] = useState(false);
+  const [compileAttempts, setCompileAttempts] = useState(0);
 
   // Fetch previously deployed rulesets
   useEffect(() => {
@@ -81,6 +87,11 @@ export default function DeployPage() {
       }
 
       setCompact(data.compact);
+      setEditedCompact(data.compact);
+      setValidationErrors(data.validation || []);
+      setCompileAttempts(data.attempts || 1);
+      setNeedsHumanReview(data.needsHumanReview || false);
+      setEditMode(data.needsHumanReview || false);
       transitionTo(2);
     } catch (e: any) {
       setError(e.message || "Network error");
@@ -103,7 +114,7 @@ export default function DeployPage() {
       const res = await fetch("/api/deploy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ compact, name, category, description }),
+        body: JSON.stringify({ compact: editedCompact || compact, name, category, description }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -125,8 +136,13 @@ export default function DeployPage() {
     setCategory("");
     setDescription("");
     setCompact("");
+    setEditedCompact("");
     setDeployResult(null);
     setError("");
+    setValidationErrors([]);
+    setNeedsHumanReview(false);
+    setEditMode(false);
+    setCompileAttempts(0);
     closeModal();
   }
 
@@ -605,7 +621,7 @@ export default function DeployPage() {
                       {compiling ? (
                         <span className="flex items-center gap-2">
                           <span className="inline-block w-3 h-3 border border-black border-t-transparent rounded-full animate-spin" />
-                          Compiling...
+                          Compiling & Validating...
                         </span>
                       ) : (
                         "Compile →"
@@ -648,9 +664,36 @@ export default function DeployPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    {compact && (
+                    <button
+                      onClick={() => setEditMode(!editMode)}
+                      className={`text-[10px] uppercase tracking-wider transition-colors cursor-pointer ${
+                        editMode ? "text-[var(--warning)]" : "text-[var(--text-muted)] hover:text-white"
+                      }`}
+                    >
+                      {editMode ? "View" : "Edit"}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setValidating(true);
+                        try {
+                          const res = await fetch("/api/validate", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ compact: editedCompact || compact }),
+                          });
+                          const data = await res.json();
+                          setValidationErrors(data.errors || []);
+                          if (data.valid) setNeedsHumanReview(false);
+                        } catch {} finally { setValidating(false); }
+                      }}
+                      disabled={validating}
+                      className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer"
+                    >
+                      {validating ? "Checking..." : "Re-validate"}
+                    </button>
+                    {(editedCompact || compact) && (
                       <button
-                        onClick={() => navigator.clipboard.writeText(compact)}
+                        onClick={() => navigator.clipboard.writeText(editedCompact || compact)}
                         className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer"
                       >
                         Copy
@@ -665,34 +708,80 @@ export default function DeployPage() {
                   </div>
                 </div>
 
+                {/* Validation status bar */}
+                {validationErrors.length > 0 && (
+                  <div className={`px-5 py-2 border-b border-[var(--border)] text-[10px] uppercase tracking-wider ${
+                    validationErrors.some((e: any) => e.severity === "error")
+                      ? "bg-[rgba(255,51,51,0.05)] text-[var(--danger)]"
+                      : "bg-[rgba(255,170,0,0.05)] text-[var(--warning)]"
+                  }`}>
+                    {needsHumanReview && (
+                      <div className="mb-1 font-bold normal-case tracking-normal text-[11px]">
+                        Auto-fix failed after {compileAttempts} attempts. Please review and fix the issues below.
+                      </div>
+                    )}
+                    {validationErrors.map((e: any, i: number) => (
+                      <div key={i} className="py-0.5">
+                        <span className="opacity-60">L{e.line}:</span> {e.message}
+                        {e.severity === "warning" && <span className="ml-1 opacity-50">(warning)</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {validationErrors.length === 0 && compact && (
+                  <div className="px-5 py-2 border-b border-[var(--border)] bg-[rgba(0,255,65,0.03)] text-[10px] uppercase tracking-wider text-[var(--accent)]">
+                    All validation checks passed
+                  </div>
+                )}
+
                 {/* Code body */}
                 <div className="p-0">
-                  <pre className="p-5 text-xs leading-relaxed overflow-x-auto max-h-[50vh] overflow-y-auto">
-                    <code>
-                      {compact.split("\n").map((line, i) => (
-                        <div key={i} className="flex hover:bg-[var(--bg-hover)] transition-colors">
-                          <span className="w-8 text-right pr-3 text-[var(--text-muted)] select-none shrink-0">
-                            {i + 1}
-                          </span>
-                          <span
-                            className={
-                              line.trimStart().startsWith("//")
-                                ? "text-[var(--text-muted)]"
-                                : line.includes("export") ||
-                                  line.includes("pragma") ||
-                                  line.includes("import")
-                                ? "text-[var(--accent-dim)]"
-                                : line.includes("assert")
-                                ? "text-[var(--warning)]"
-                                : "text-[var(--text-primary)]"
-                            }
-                          >
-                            {line || "\u00A0"}
-                          </span>
-                        </div>
-                      ))}
-                    </code>
-                  </pre>
+                  {editMode ? (
+                    <textarea
+                      value={editedCompact}
+                      onChange={(e) => setEditedCompact(e.target.value)}
+                      className="w-full p-5 text-xs leading-relaxed font-mono bg-transparent text-[var(--text-primary)] border-none outline-none resize-none min-h-[40vh] max-h-[50vh] overflow-y-auto"
+                      spellCheck={false}
+                    />
+                  ) : (
+                    <pre className="p-5 text-xs leading-relaxed overflow-x-auto max-h-[50vh] overflow-y-auto">
+                      <code>
+                        {(editedCompact || compact).split("\n").map((line, i) => {
+                          const lineErrors = validationErrors.filter((e: any) => e.line === i + 1);
+                          return (
+                            <div key={i} className={`flex transition-colors ${
+                              lineErrors.length > 0
+                                ? lineErrors.some((e: any) => e.severity === "error")
+                                  ? "bg-[rgba(255,51,51,0.08)]"
+                                  : "bg-[rgba(255,170,0,0.06)]"
+                                : "hover:bg-[var(--bg-hover)]"
+                            }`}>
+                              <span className="w-8 text-right pr-3 text-[var(--text-muted)] select-none shrink-0">
+                                {i + 1}
+                              </span>
+                              <span
+                                className={
+                                  lineErrors.some((e: any) => e.severity === "error")
+                                    ? "text-[var(--danger)]"
+                                    : line.trimStart().startsWith("//")
+                                    ? "text-[var(--text-muted)]"
+                                    : line.includes("export") ||
+                                      line.includes("pragma") ||
+                                      line.includes("import")
+                                    ? "text-[var(--accent-dim)]"
+                                    : line.includes("assert")
+                                    ? "text-[var(--warning)]"
+                                    : "text-[var(--text-primary)]"
+                                }
+                              >
+                                {line || "\u00A0"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </code>
+                    </pre>
+                  )}
                 </div>
 
                 {/* Source rules summary */}
@@ -731,11 +820,16 @@ export default function DeployPage() {
                         Name required
                       </span>
                     )}
+                    {validationErrors.some((e: any) => e.severity === "error") && (
+                      <span className="text-[10px] text-[var(--danger)] uppercase tracking-wider">
+                        Fix errors first
+                      </span>
+                    )}
                     <button
                       onClick={handleDeploy}
-                      disabled={deploying || !name.trim()}
+                      disabled={deploying || !name.trim() || validationErrors.some((e: any) => e.severity === "error")}
                       className={`btn-brutal px-5 py-2.5 text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer ${
-                        deploying || !name.trim()
+                        deploying || !name.trim() || validationErrors.some((e: any) => e.severity === "error")
                           ? "bg-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
                           : "bg-white text-black hover:bg-[var(--text-primary)]"
                       }`}

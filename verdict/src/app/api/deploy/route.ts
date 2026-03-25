@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deployVerdictContract } from "../../../lib/midnight";
+import { validateCompact } from "../../../lib/compact-validator";
 
 export async function POST(req: NextRequest) {
   const { compact, name, category, description } = await req.json();
@@ -18,9 +19,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!compact.includes("pragma language_version")) {
+  // Validate Compact code before deployment
+  const validation = validateCompact(compact);
+  const criticalErrors = validation.errors.filter(e => e.severity === "error");
+  if (criticalErrors.length > 0) {
     return NextResponse.json(
-      { error: "Invalid Compact code: missing pragma" },
+      {
+        error: "Compact code has validation errors",
+        validation: criticalErrors,
+      },
       { status: 400 }
     );
   }
