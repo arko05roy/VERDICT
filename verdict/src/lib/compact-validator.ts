@@ -76,12 +76,15 @@ export function validateCompact(code: string): ValidationResult {
   }
 
   // --- 1. Pragma check ---
-  const pragmaMatch = code.match(/pragma\s+language_version\s+([\d.]+)\s*;/);
+  const pragmaMatch = code.match(/pragma\s+language_version\s*(>=?\s*)?([\d.]+)\s*;/);
   if (!pragmaMatch) {
-    errors.push({ line: 1, message: "Missing `pragma language_version 0.22;`", severity: "error" });
-  } else if (pragmaMatch[1] !== "0.22") {
-    const pragmaLine = lines.findIndex(l => l.includes("pragma language_version")) + 1;
-    errors.push({ line: pragmaLine, message: `Pragma version should be 0.22, got ${pragmaMatch[1]}`, severity: "error" });
+    errors.push({ line: 1, message: "Missing `pragma language_version >= 0.20;`", severity: "error" });
+  } else {
+    const version = parseFloat(pragmaMatch[2]);
+    if (version < 0.20) {
+      const pragmaLine = lines.findIndex(l => l.includes("pragma language_version")) + 1;
+      errors.push({ line: pragmaLine, message: `Pragma version should be at least 0.20, got ${pragmaMatch[2]}`, severity: "error" });
+    }
   }
 
   // --- 2. Import check ---

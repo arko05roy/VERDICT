@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       category: ruleset.category,
       description: ruleset.description,
       deployedAt: ruleset.deployedAt,
-      network: "midnight-local",
+      network: process.env.MIDNIGHT_NETWORK || "undeployed",
       txHash: ruleset.txHash,
       sdk: `import { Verdict } from "@verdict/sdk";\nconst v = new Verdict("${ruleset.address}");\nconst proof = await v.verify(stateTransition);`,
     });

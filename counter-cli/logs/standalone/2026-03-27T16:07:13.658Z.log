@@ -1,0 +1,4 @@
+{"level":30,"time":1774627663786,"pid":30483,"hostname":"Arkos-MacBook-Air.local","msg":"Deploying verdict contract..."}
+{"level":30,"time":1774627682098,"pid":30483,"hostname":"Arkos-MacBook-Air.local","msg":"Deployed contract at address: 281f45df4dd5ead08ed1e542a30c2470c2c004d562e9ed2e629d549b286a4768"}
+{"level":30,"time":1774627682099,"pid":30483,"hostname":"Arkos-MacBook-Air.local","msg":"Checking contract ledger state..."}
+{"level":30,"time":1774627682108,"pid":30483,"hostname":"Arkos-MacBook-Air.local","msg":"Ledger: totalChecks=0, totalFlagged=0, lastVerdict=0, sessionActive=false"}
