@@ -17,6 +17,8 @@
   },
   "scripts": {
     "compact": "compact compile src/verdict.compact src/managed/verdict",
+    "compact:dao": "compact compile src/verdict-dao.compact src/managed/verdict-dao",
+    "compact:all": "npm run compact && npm run compact:dao",
     "test": "vitest run",
     "test:compile": "npm run compact && vitest run",
     "build": "rm -rf dist && tsc --project tsconfig.build.json && cp -Rf ./src/managed ./dist/managed && cp ./src/verdict.compact ./dist",

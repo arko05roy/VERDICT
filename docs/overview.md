@@ -41,24 +41,26 @@ Your System (games, finance, insurance — anything rule-based)
 
 The system under verification never pauses. VERDICT operates asynchronously in the background. If a violation is detected, it's flagged retroactively — with mathematical certainty.
 
-## The 10-Check Architecture
+## The Guardians
 
-VERDICT consolidates **every category of rule violation** into exactly 10 mathematical checks. These aren't arbitrary — they map to the fundamental taxonomy of state transition violations across any domain:
+VERDICT's verification primitives are called **Guardians** — each named after a figure from Greek or Roman mythology. They are modular: you select which Guardians your system needs, configure their parameters, and deploy a custom circuit containing only those checks.
 
-| # | Check | Category | What It Catches |
-|---|-------|----------|-----------------|
-| 1 | Hash-Chain Integrity | Cryptographic | Fabricated data, replay attacks |
-| 2 | Commit-Reveal | Cryptographic | Retroactive editing, front-running |
-| 3 | Velocity | Rate (1st order) | State changes faster than allowed |
-| 4 | Acceleration | Rate (2nd order) | Gradual ramp exploits |
-| 5 | Bounds | Spatial | Out-of-range states |
-| 6 | Action Validity | Rule | Invalid or impossible operations |
-| 7 | Action Frequency | Temporal | Superhuman speed, spam |
-| 8 | Behavioral Entropy | Statistical | Automated/scripted patterns |
-| 9 | Precision Anomaly | Statistical | Algorithmic precision |
-| 10 | Information Leakage | Info-theoretic | Acting on hidden data |
+| # | Guardian | Category | What It Proves |
+|---|----------|----------|----------------|
+| I | **Mnemosyne** | Integrity | History chain — no state can be fabricated or replayed |
+| II | **Styx** | Integrity | Oath binding — actions committed before outcomes revealed |
+| III | **Hermes** | Rate Limit | First-order rate — state cannot change faster than allowed |
+| IV | **Phaethon** | Rate Limit | Second-order rate — acceleration cannot exceed limits |
+| V | **Terminus** | Boundary | Boundary enforcement — state must stay within valid ranges |
+| VI | **Themis** | Validity | Action legitimacy — only defined operations are permitted |
+| VII | **Chronos** | Validity | Time-window frequency — actions cannot exceed rate per window |
+| VIII | **Moirai** | Behavioral | Pattern entropy — behavior must show natural diversity |
+| IX | **Daedalus** | Behavioral | Precision anomaly — detects inhuman accuracy patterns |
+| X | **Prometheus** | Information | Knowledge leakage — detects correlation with hidden data |
 
-Checks 1-2 are hard assertions — if broken, no valid proof exists. Checks 3-10 are soft flags that aggregate into the final verdict. This means tampered data is unprovable, while rule violations are provable and recorded on-chain.
+Guardians I-II use hard assertions — if broken, no valid proof exists. Guardians III-X are soft flags that aggregate into the final verdict. Tampered data is unprovable; rule violations are provable and recorded on-chain.
+
+Rulesets are defined using **VCL (Verdict Compile Language)** — a declaration format that deterministically compiles to Compact ZK circuits. No AI generates code. The Guardian library is governed by an on-chain DAO where anyone can propose new Guardians for community vote.
 
 See [The 10 Checks](./the-10-checks.md) for the full breakdown with actual circuit code.
 

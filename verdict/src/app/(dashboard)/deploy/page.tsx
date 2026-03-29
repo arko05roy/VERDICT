@@ -1,65 +1,87 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 
-const EXAMPLE_RULES = `Players cannot move faster than 5 units per tick
-Cards must be in the player's hand before playing
-RNG must be committed before the bet is placed
-No action can exceed 10 per second
-Position must stay within map bounds (0-1000)`;
+type CheckMeta = {
+  id: string;
+  mythName: string;
+  numeral: string;
+  category: string;
+  symbol: string;
+  description: string;
+  longDescription: string;
+  isHardFail: boolean;
+  publicParams: { name: string; type: string; description: string; required: boolean }[];
+  dependencies: string[];
+};
 
-type ModalStep = 0 | 1 | 2 | 3; // 0 = no modal, 1 = define, 2 = review, 3 = deploy result
+type Suggestion = {
+  checkId: string;
+  confidence: number;
+  suggestedParams: Record<string, string>;
+  reason: string;
+};
+
+type ModalStep = 0 | 1 | 2 | 3 | 4 | 5;
+
+const CATEGORY_ORDER = ["integrity", "rate-limit", "boundary", "validity", "behavioral", "information"];
+const CATEGORY_LABELS: Record<string, string> = {
+  integrity: "INTEGRITY",
+  "rate-limit": "RATE LIMITS",
+  boundary: "BOUNDARIES",
+  validity: "VALIDITY",
+  behavioral: "BEHAVIORAL",
+  information: "INFORMATION",
+};
 
 export default function DeployPage() {
-  const [rules, setRules] = useState("");
+  // Step 1 state
+  const [systemDescription, setSystemDescription] = useState("");
   const [name, setName] = useState("");
-  const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
+
+  // Step 2 state
+  const [allChecks, setAllChecks] = useState<CheckMeta[]>([]);
+  const [enabledChecks, setEnabledChecks] = useState<Set<string>>(new Set());
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggesting, setSuggesting] = useState(false);
+
+  // Step 3 state
+  const [checkParams, setCheckParams] = useState<Record<string, Record<string, string>>>({});
+
+  // Step 4 state
   const [compact, setCompact] = useState("");
-  const [compiling, setCompiling] = useState(false);
-  const [error, setError] = useState("");
-  const [modal, setModal] = useState<ModalStep>(0);
+  const [vcl, setVcl] = useState("");
+  const [compileError, setCompileError] = useState("");
+
+  // Step 5 state
   const [deploying, setDeploying] = useState(false);
   const [deployResult, setDeployResult] = useState<any>(null);
-  const [transitioning, setTransitioning] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [rulesets, setRulesets] = useState<any[]>([]);
-  const [validationErrors, setValidationErrors] = useState<any[]>([]);
-  const [needsHumanReview, setNeedsHumanReview] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [editedCompact, setEditedCompact] = useState("");
-  const [validating, setValidating] = useState(false);
-  const [compileAttempts, setCompileAttempts] = useState(0);
-  const [scaffoldEndLine, setScaffoldEndLine] = useState(0);
-  const [aiFixing, setAiFixing] = useState(false);
 
-  // Fetch previously deployed rulesets
+  // UI state
+  const [modal, setModal] = useState<ModalStep>(0);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [error, setError] = useState("");
+  const [rulesets, setRulesets] = useState<any[]>([]);
+
   useEffect(() => {
-    fetch("/api/rulesets")
-      .then((r) => r.json())
-      .then((d) => setRulesets(d.rulesets || []))
-      .catch(() => {});
+    fetch("/api/checks").then((r) => r.json()).then((d) => setAllChecks(d.checks || [])).catch(() => {});
+    fetch("/api/rulesets").then((r) => r.json()).then((d) => setRulesets(d.rulesets || [])).catch(() => {});
   }, [deployResult]);
 
-  // Animate modal in
   useEffect(() => {
     if (modal > 0) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setModalVisible(true));
-      });
+      requestAnimationFrame(() => { requestAnimationFrame(() => setModalVisible(true)); });
     }
   }, [modal]);
 
   const transitionTo = useCallback((next: ModalStep) => {
-    setTransitioning(true);
     setModalVisible(false);
     setTimeout(() => {
       setModal(next);
-      setTransitioning(false);
       if (next > 0) {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => setModalVisible(true));
-        });
+        requestAnimationFrame(() => { requestAnimationFrame(() => setModalVisible(true)); });
       }
     }, 350);
   }, []);
@@ -69,63 +91,140 @@ export default function DeployPage() {
     setTimeout(() => setModal(0), 350);
   }, []);
 
-  async function handleCompile() {
-    if (!rules.trim()) return;
-    setCompiling(true);
+  // ─── Step 1: Suggest Guardians ───
+  async function handleSuggest() {
+    if (!systemDescription.trim()) return;
+    setSuggesting(true);
     setError("");
+    try {
+      const res = await fetch("/api/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: systemDescription }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error); return; }
+
+      const sugg: Suggestion[] = data.suggestions || [];
+      setSuggestions(sugg);
+
+      // Pre-enable suggested checks
+      const suggested = new Set(sugg.map((s: Suggestion) => s.checkId));
+      setEnabledChecks(suggested);
+
+      // Pre-fill suggested params
+      const params: Record<string, Record<string, string>> = {};
+      for (const s of sugg) {
+        if (s.suggestedParams && Object.keys(s.suggestedParams).length > 0) {
+          params[s.checkId] = s.suggestedParams;
+        }
+      }
+      setCheckParams(params);
+
+      transitionTo(2);
+    } catch (e: any) {
+      setError(e.message || "Suggestion failed");
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  function handleSkipSuggest() {
+    setSuggestions([]);
+    transitionTo(2);
+  }
+
+  // ─── Step 2: Toggle checks ───
+  function toggleCheck(id: string) {
+    setEnabledChecks((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function getDependencyWarnings(): string[] {
+    const warnings: string[] = [];
+    for (const id of enabledChecks) {
+      const check = allChecks.find((c) => c.id === id);
+      if (!check) continue;
+      for (const dep of check.dependencies) {
+        if (!enabledChecks.has(dep)) {
+          const depCheck = allChecks.find((c) => c.id === dep);
+          warnings.push(`${check.mythName} requires ${depCheck?.mythName || dep}`);
+        }
+      }
+    }
+    return warnings;
+  }
+
+  // ─── Step 3→4: Build VCL and compile ───
+  async function handleCompile() {
+    setCompileError("");
     setCompact("");
+
+    // Build VCL from enabled checks + params
+    let vclStr = "version 1.0\n";
+    for (const id of enabledChecks) {
+      const check = allChecks.find((c) => c.id === id);
+      if (!check) continue;
+      const params = checkParams[id] || {};
+      const paramLines = Object.entries(params)
+        .filter(([, v]) => v.trim() !== "")
+        .map(([k, v]) => `  ${k}: ${v}`)
+        .join("\n");
+      if (paramLines) {
+        vclStr += `\nuse ${check.mythName} {\n${paramLines}\n}\n`;
+      } else {
+        vclStr += `\nuse ${check.mythName} {}\n`;
+      }
+    }
+    setVcl(vclStr);
 
     try {
       const res = await fetch("/api/compile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rules }),
+        body: JSON.stringify({ vcl: vclStr }),
       });
       const data = await res.json();
-
       if (!res.ok) {
-        setError(data.error || "Compilation failed");
+        const errMsg = data.vclErrors
+          ? data.vclErrors.map((e: any) => `Line ${e.line}: ${e.message}`).join("\n")
+          : data.error || "Compilation failed";
+        setCompileError(errMsg);
         return;
       }
-
       setCompact(data.compact);
-      setEditedCompact(data.compact);
-      setValidationErrors(data.validation || []);
-      setCompileAttempts(data.attempts || 1);
-      setNeedsHumanReview(data.needsHumanReview || false);
-      setEditMode(data.needsHumanReview || false);
-      setScaffoldEndLine(data.scaffoldEndLine || 0);
-      transitionTo(2);
+      transitionTo(4);
     } catch (e: any) {
-      setError(e.message || "Network error");
-    } finally {
-      setCompiling(false);
+      setCompileError(e.message || "Network error");
     }
   }
 
-  function handleLoadExample() {
-    setRules(EXAMPLE_RULES);
-    setName("fps-movement-rules");
-    setCategory("fps");
-    setDescription("Movement and action integrity checks for FPS games");
-  }
-
+  // ─── Step 5: Deploy ───
   async function handleDeploy() {
     setDeploying(true);
     setError("");
     try {
+      const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
       const res = await fetch("/api/deploy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ compact: editedCompact || compact, name, category, description }),
+        body: JSON.stringify({
+          compact,
+          name,
+          description,
+          tags,
+          enabledChecks: [...enabledChecks],
+          vcl,
+        }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Deploy failed");
-        return;
-      }
+      if (!res.ok) { setError(data.error || "Deploy failed"); return; }
       setDeployResult(data);
-      transitionTo(3);
+      transitionTo(5);
     } catch (e: any) {
       setError(e.message || "Network error");
     } finally {
@@ -134,881 +233,403 @@ export default function DeployPage() {
   }
 
   function resetAll() {
-    setRules("");
-    setName("");
-    setCategory("");
-    setDescription("");
-    setCompact("");
-    setEditedCompact("");
-    setDeployResult(null);
-    setError("");
-    setValidationErrors([]);
-    setNeedsHumanReview(false);
-    setEditMode(false);
-    setCompileAttempts(0);
-    closeModal();
+    setSystemDescription(""); setName(""); setDescription(""); setTagsInput("");
+    setEnabledChecks(new Set()); setSuggestions([]); setCheckParams({});
+    setCompact(""); setVcl(""); setCompileError(""); setDeployResult(null);
+    setError(""); closeModal();
   }
 
-  const tarotCards = [
-    {
-      n: 1,
-      label: "DEFINE",
-      numeral: "I",
-      title: "The Scribe",
-      desc: "Write game rules in plain English",
-      symbol: (
-        <svg viewBox="0 0 80 100" className="w-16 h-20 mx-auto" fill="none" stroke="currentColor" strokeWidth="1">
-          {/* Quill / scroll */}
-          <path d="M40 10 L55 30 L50 90 L40 85 L30 90 L25 30 Z" strokeWidth="0.8" />
-          <path d="M30 40 L50 40" strokeWidth="0.5" opacity="0.5" />
-          <path d="M32 50 L48 50" strokeWidth="0.5" opacity="0.5" />
-          <path d="M33 60 L47 60" strokeWidth="0.5" opacity="0.5" />
-          <path d="M34 70 L46 70" strokeWidth="0.5" opacity="0.5" />
-          <circle cx="40" cy="25" r="4" strokeWidth="0.8" />
-          <path d="M36 25 L44 25 M40 21 L40 29" strokeWidth="0.5" />
-        </svg>
-      ),
-    },
-    {
-      n: 2,
-      label: "REVIEW",
-      numeral: "II",
-      title: "The Oracle",
-      desc: "Inspect compiled Compact ZK circuit",
-      symbol: (
-        <svg viewBox="0 0 80 100" className="w-16 h-20 mx-auto" fill="none" stroke="currentColor" strokeWidth="1">
-          {/* Eye of truth */}
-          <ellipse cx="40" cy="45" rx="25" ry="16" strokeWidth="0.8" />
-          <circle cx="40" cy="45" r="8" strokeWidth="0.8" />
-          <circle cx="40" cy="45" r="3" strokeWidth="0.8" />
-          <path d="M40 20 L40 29" strokeWidth="0.5" />
-          <path d="M40 61 L40 70" strokeWidth="0.5" />
-          <path d="M20 30 L27 35" strokeWidth="0.5" />
-          <path d="M60 30 L53 35" strokeWidth="0.5" />
-          <path d="M20 60 L27 55" strokeWidth="0.5" />
-          <path d="M60 60 L53 55" strokeWidth="0.5" />
-          {/* Rays */}
-          <path d="M40 12 L38 18 L40 16 L42 18 Z" strokeWidth="0.5" />
-          <path d="M40 78 L38 72 L40 74 L42 72 Z" strokeWidth="0.5" />
-        </svg>
-      ),
-    },
-    {
-      n: 3,
-      label: "DEPLOY",
-      numeral: "III",
-      title: "The Architect",
-      desc: "Push to Midnight network",
-      symbol: (
-        <svg viewBox="0 0 80 100" className="w-16 h-20 mx-auto" fill="none" stroke="currentColor" strokeWidth="1">
-          {/* Tower / structure */}
-          <path d="M40 10 L60 35 L55 90 L25 90 L20 35 Z" strokeWidth="0.8" />
-          <path d="M40 10 L40 30" strokeWidth="0.5" />
-          <rect x="34" y="45" width="12" height="15" strokeWidth="0.8" />
-          <path d="M40 45 L40 60" strokeWidth="0.5" />
-          <path d="M34 52 L46 52" strokeWidth="0.5" />
-          {/* Base lines */}
-          <path d="M28 75 L52 75" strokeWidth="0.5" opacity="0.5" />
-          <path d="M26 82 L54 82" strokeWidth="0.5" opacity="0.5" />
-          {/* Crown */}
-          <path d="M35 10 L40 5 L45 10" strokeWidth="0.8" />
-          <circle cx="40" cy="5" r="2" strokeWidth="0.5" />
-        </svg>
-      ),
-    },
+  // ─── Grouped checks for Step 2 ───
+  const groupedChecks = CATEGORY_ORDER.map((cat) => ({
+    category: cat,
+    label: CATEGORY_LABELS[cat],
+    checks: allChecks.filter((c) => c.category === cat),
+  })).filter((g) => g.checks.length > 0);
+
+  // ─── Tarot step cards ───
+  const steps = [
+    { n: 1, numeral: "I", label: "DESCRIBE", title: "The Oracle", desc: "Describe your system" },
+    { n: 2, numeral: "II", label: "CHOOSE", title: "The Fates", desc: "Select your guardians" },
+    { n: 3, numeral: "III", label: "CONFIGURE", title: "The Scribe", desc: "Set parameters" },
+    { n: 4, numeral: "IV", label: "REVIEW", title: "The Eye", desc: "Review compiled circuit" },
+    { n: 5, numeral: "V", label: "DEPLOY", title: "The Architect", desc: "Deploy to Midnight" },
   ];
 
+  function setParam(checkId: string, paramName: string, value: string) {
+    setCheckParams((prev) => ({
+      ...prev,
+      [checkId]: { ...(prev[checkId] || {}), [paramName]: value },
+    }));
+  }
+
   return (
-    <div className="p-6 relative">
+    <div className="min-h-screen p-8">
       {/* Header */}
-      <div className="mb-10 text-center">
-        <div className="flex items-center justify-center gap-3 mb-4 opacity-30">
-          <div className="w-12 h-px bg-white" />
-          <span className="text-white text-[10px]">◈</span>
-          <div className="w-12 h-px bg-white" />
-        </div>
-        <h1 className="text-lg text-white font-bold tracking-[0.2em] uppercase">
-          Deploy Ruleset
-        </h1>
-        <p className="text-[11px] text-[var(--text-muted)] mt-2 tracking-wide">
-          Choose your path. Each card reveals the next step of the ritual.
-        </p>
+      <div className="max-w-6xl mx-auto mb-12">
+        <p className="text-[var(--text-muted)] text-xs tracking-[0.3em] mb-2">DEPLOY RULESET</p>
+        <h1 className="text-2xl text-[var(--text-primary)] mb-1">Choose your path</h1>
+        <p className="text-sm text-[var(--text-secondary)]">Each card reveals the next step</p>
       </div>
 
-      {/* Tarot Cards */}
-      <div className="flex items-center justify-center gap-6">
-        {tarotCards.map((card) => {
-          const isActive =
-            card.n === 1 ||
-            (card.n === 2 && compact !== "") ||
-            (card.n === 3 && deployResult !== null);
-          const isCompleted =
-            (card.n === 1 && rules !== "") ||
-            (card.n === 2 && compact !== "") ||
-            (card.n === 3 && deployResult !== null);
-
-          return (
-            <button
-              key={card.n}
-              onClick={() => {
-                if (card.n === 1) setModal(1);
-                else if (card.n === 2 && compact) setModal(2);
-                else if (card.n === 3 && deployResult) setModal(3);
-                else setModal(1);
-              }}
-              className={`group relative cursor-pointer transition-all duration-500 ${
-                isActive
-                  ? "hover:-translate-y-3 hover:shadow-[0_20px_60px_rgba(0,255,65,0.1)]"
-                  : "opacity-30 hover:opacity-50"
-              }`}
-              style={{ width: 220, height: 340 }}
-            >
-              {/* Card border — double line like real tarot */}
-              <div
-                className="absolute inset-0 border border-[var(--border-bright)] transition-colors duration-500 group-hover:border-[var(--accent)]"
-                style={{ background: "var(--bg-secondary)" }}
-              />
-              {/* Inner border */}
-              <div className="absolute inset-[6px] border border-[var(--border)] group-hover:border-[var(--border-bright)] transition-colors duration-500" />
-
-              {/* Corner ornaments */}
-              <div className="absolute top-[10px] left-[10px] text-[8px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors">◆</div>
-              <div className="absolute top-[10px] right-[10px] text-[8px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors">◆</div>
-              <div className="absolute bottom-[10px] left-[10px] text-[8px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors rotate-180">◆</div>
-              <div className="absolute bottom-[10px] right-[10px] text-[8px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors rotate-180">◆</div>
-
-              {/* Numeral at top */}
-              <div className="absolute top-[22px] left-0 right-0 text-center">
-                <span className="text-[11px] tracking-[0.3em] text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors">
-                  {card.numeral}
-                </span>
-              </div>
-
-              {/* Decorative top line */}
-              <div className="absolute top-[38px] left-[20px] right-[20px] flex items-center gap-2 opacity-30">
-                <div className="flex-1 h-px bg-current text-[var(--border-bright)]" />
-                <span className="text-[6px] text-[var(--border-bright)]">✦</span>
-                <div className="flex-1 h-px bg-current text-[var(--border-bright)]" />
-              </div>
-
-              {/* Symbol — center of card */}
-              <div className={`absolute top-[55px] left-0 right-0 transition-colors duration-500 ${
-                isCompleted ? "text-[var(--accent)]" : "text-[var(--border-bright)] group-hover:text-[var(--text-secondary)]"
-              }`}>
-                {card.symbol}
-              </div>
-
-              {/* Decorative bottom line */}
-              <div className="absolute bottom-[120px] left-[20px] right-[20px] flex items-center gap-2 opacity-30">
-                <div className="flex-1 h-px bg-current text-[var(--border-bright)]" />
-                <span className="text-[6px] text-[var(--border-bright)]">✦</span>
-                <div className="flex-1 h-px bg-current text-[var(--border-bright)]" />
-              </div>
-
-              {/* Title */}
-              <div className="absolute bottom-[80px] left-0 right-0 text-center">
-                <span className="text-[13px] uppercase tracking-[0.2em] text-[var(--text-primary)] font-bold group-hover:text-white transition-colors">
-                  {card.title}
-                </span>
-              </div>
-
-              {/* Label */}
-              <div className="absolute bottom-[60px] left-0 right-0 text-center">
-                <span className="text-[9px] uppercase tracking-[0.25em] text-[var(--text-muted)]">
-                  {card.label}
-                </span>
-              </div>
-
-              {/* Description / status */}
-              <div className="absolute bottom-[28px] left-[16px] right-[16px] text-center">
-                {card.n === 1 && rules ? (
-                  <span className="text-[10px] text-[var(--accent-dim)] font-mono">
-                    {rules.trim().split("\n").filter(Boolean).length} rules inscribed
-                  </span>
-                ) : card.n === 2 && compact ? (
-                  <span className="text-[10px] text-[var(--accent-dim)] font-mono">
-                    {compact.split("\n").length} lines revealed
-                  </span>
-                ) : card.n === 3 && deployResult ? (
-                  <span className="text-[10px] text-[var(--accent)] font-mono">
-                    ✦ SEALED ✦
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-[var(--text-muted)] leading-relaxed">
-                    {card.desc}
-                  </span>
-                )}
-              </div>
-
-              {/* Glow effect on hover */}
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
-                style={{
-                  background: "radial-gradient(ellipse at center, rgba(0,255,65,0.04) 0%, transparent 70%)",
-                }}
-              />
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Action row */}
-      <div className="mt-8 flex items-center justify-center gap-4">
-        <button
-          onClick={() => setModal(1)}
-          className="btn-brutal px-5 py-2.5 text-[11px] uppercase tracking-[0.15em] font-bold bg-white text-black hover:bg-[var(--text-primary)] transition-all cursor-pointer"
-        >
-          Begin Ritual
-        </button>
-        {deployResult && (
+      {/* Step cards */}
+      <div className="max-w-6xl mx-auto grid grid-cols-5 gap-4 mb-16">
+        {steps.map((s) => (
           <button
-            onClick={resetAll}
-            className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all cursor-pointer"
+            key={s.n}
+            onClick={() => {
+              if (s.n === 1) transitionTo(1);
+            }}
+            className={`group relative border rounded-sm p-6 text-center transition-all duration-300
+              ${s.n === 1 ? "border-[var(--border-bright)] hover:border-[var(--accent)] cursor-pointer" : "border-[var(--border)] cursor-default opacity-40"}
+              bg-[var(--bg-secondary)]`}
           >
-            Reset
+            <p className="text-[10px] text-[var(--text-muted)] tracking-[0.3em] mb-3">{s.numeral}</p>
+            <div className="text-3xl text-[var(--text-muted)] mb-3 group-hover:text-[var(--accent)] transition-colors">{"\u25C7"}</div>
+            <p className="text-xs tracking-[0.2em] text-[var(--text-primary)] mb-1">{s.label}</p>
+            <p className="text-[10px] text-[var(--text-secondary)]">{s.title}</p>
           </button>
-        )}
+        ))}
       </div>
 
-      {/* ═══════ PAST RULESETS — TAROT COLLECTION ═══════ */}
-      {rulesets.length > 0 && (
-        <div className="mt-14">
-          {/* Section divider */}
-          <div className="flex items-center gap-4 mb-8">
-            <div className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg, var(--border-bright) 0 2px, transparent 2px 6px)" }} />
-            <span className="text-[10px] uppercase tracking-[0.3em] text-[var(--text-muted)]">✦ Your Rulesets ✦</span>
-            <div className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg, var(--border-bright) 0 2px, transparent 2px 6px)" }} />
-          </div>
+      {/* Modal overlay */}
+      {modal > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div
+            className={`relative w-full max-w-4xl max-h-[85vh] overflow-y-auto mx-4 border border-[var(--border-bright)] bg-[var(--bg-primary)] rounded-sm p-8 transition-all duration-350 ${modalVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"}`}
+          >
+            {/* Close button */}
+            <button onClick={closeModal} className="absolute top-4 right-4 text-[var(--text-muted)] hover:text-[var(--text-primary)] text-lg">{"\u2715"}</button>
 
-          {/* 3-per-row grid */}
-          <div className="grid grid-cols-3 gap-5">
-            {rulesets.map((rs, idx) => {
-              const categorySymbols: Record<string, string> = {
-                fps: "⊕",
-                "card-game": "♠",
-                mmorpg: "⚔",
-                "turn-based": "♟",
-                casino: "♦",
-                "battle-royale": "◎",
-              };
-              const sym = categorySymbols[rs.category] || "◈";
-              const romanNumerals = ["IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
-              const numeral = romanNumerals[idx % romanNumerals.length];
+            {/* ════ STEP 1: DESCRIBE ════ */}
+            {modal === 1 && (
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] tracking-[0.3em] mb-1">I</p>
+                <h2 className="text-xl text-[var(--text-primary)] mb-1">The Oracle</h2>
+                <p className="text-xs text-[var(--text-secondary)] mb-8">Describe your system. The oracle will suggest guardians.</p>
 
-              return (
-                <div
-                  key={rs.address}
-                  className="group relative cursor-default transition-all duration-500 hover:-translate-y-2"
-                  style={{ height: 280 }}
-                >
-                  {/* Outer border */}
-                  <div className="absolute inset-0 border border-[var(--border)] group-hover:border-[var(--accent-dim)] transition-colors duration-500" style={{ background: "var(--bg-secondary)" }} />
-                  {/* Inner border */}
-                  <div className="absolute inset-[5px] border border-[var(--border)] group-hover:border-[var(--border-bright)] transition-colors duration-500" />
-
-                  {/* Corner ornaments */}
-                  <div className="absolute top-[8px] left-[8px] text-[6px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors">◆</div>
-                  <div className="absolute top-[8px] right-[8px] text-[6px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors">◆</div>
-                  <div className="absolute bottom-[8px] left-[8px] text-[6px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors rotate-180">◆</div>
-                  <div className="absolute bottom-[8px] right-[8px] text-[6px] text-[var(--text-muted)] group-hover:text-[var(--accent-dim)] transition-colors rotate-180">◆</div>
-
-                  {/* Numeral */}
-                  <div className="absolute top-[18px] left-0 right-0 text-center">
-                    <span className="text-[9px] tracking-[0.3em] text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors">{numeral}</span>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-1">SYSTEM DESCRIPTION</label>
+                    <textarea
+                      value={systemDescription}
+                      onChange={(e) => setSystemDescription(e.target.value)}
+                      rows={5}
+                      className="w-full bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-sm p-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                      placeholder="e.g., A decentralized exchange where users submit limit orders. Orders are matched by a centralized engine. We need to verify that the engine executes trades at the declared price and doesn't front-run user orders."
+                    />
                   </div>
 
-                  {/* Top divider */}
-                  <div className="absolute top-[32px] left-[14px] right-[14px] flex items-center gap-1.5 opacity-25">
-                    <div className="flex-1 h-px bg-[var(--border-bright)]" />
-                    <span className="text-[5px] text-[var(--border-bright)]">✦</span>
-                    <div className="flex-1 h-px bg-[var(--border-bright)]" />
-                  </div>
-
-                  {/* Category symbol — large center */}
-                  <div className="absolute top-[50px] left-0 right-0 text-center text-[var(--border-bright)] group-hover:text-[var(--accent)] transition-colors duration-500">
-                    <span className="text-3xl">{sym}</span>
-                  </div>
-
-                  {/* Category tag */}
-                  <div className="absolute top-[95px] left-0 right-0 text-center">
-                    <span className="text-[8px] uppercase tracking-[0.2em] text-[var(--text-muted)]">{rs.category}</span>
-                  </div>
-
-                  {/* Bottom divider */}
-                  <div className="absolute bottom-[115px] left-[14px] right-[14px] flex items-center gap-1.5 opacity-25">
-                    <div className="flex-1 h-px bg-[var(--border-bright)]" />
-                    <span className="text-[5px] text-[var(--border-bright)]">✦</span>
-                    <div className="flex-1 h-px bg-[var(--border-bright)]" />
-                  </div>
-
-                  {/* Name */}
-                  <div className="absolute bottom-[85px] left-[14px] right-[14px] text-center">
-                    <span className="text-[11px] uppercase tracking-[0.1em] text-[var(--text-primary)] font-bold group-hover:text-white transition-colors leading-tight block">
-                      {rs.name.length > 28 ? rs.name.slice(0, 28) + "..." : rs.name}
-                    </span>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="absolute bottom-[50px] left-[14px] right-[14px] space-y-1">
-                    <div className="flex justify-between px-1">
-                      <span className="text-[8px] text-[var(--text-muted)] uppercase tracking-wider">Checks</span>
-                      <span className="text-[8px] text-[var(--text-secondary)] font-mono">{rs.totalChecks?.toLocaleString()}</span>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-1">RULESET NAME</label>
+                      <input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-sm p-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                        placeholder="e.g., order-integrity"
+                      />
                     </div>
-                    <div className="flex justify-between px-1">
-                      <span className="text-[8px] text-[var(--text-muted)] uppercase tracking-wider">Flagged</span>
-                      <span className="text-[8px] text-[var(--danger)] font-mono">{rs.flaggedRate}</span>
+                    <div>
+                      <label className="block text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-1">TAGS (comma-separated)</label>
+                      <input
+                        value={tagsInput}
+                        onChange={(e) => setTagsInput(e.target.value)}
+                        className="w-full bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-sm p-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                        placeholder="e.g., defi, order-matching, exchange"
+                      />
                     </div>
                   </div>
 
-                  {/* Status seal */}
-                  <div className="absolute bottom-[26px] left-0 right-0 text-center">
-                    <span className="text-[8px] tracking-[0.25em] uppercase text-[var(--accent-dim)] group-hover:text-[var(--accent)] transition-colors">
-                      ✦ sealed ✦
-                    </span>
+                  <div>
+                    <label className="block text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-1">DESCRIPTION</label>
+                    <input
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="w-full bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-sm p-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                      placeholder="Brief description of what this ruleset verifies"
+                    />
                   </div>
-
-                  {/* Hover glow */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" style={{ background: "radial-gradient(ellipse at center, rgba(0,255,65,0.04) 0%, transparent 70%)" }} />
                 </div>
-              );
-            })}
+
+                {error && <p className="text-[var(--danger)] text-xs mt-4">{error}</p>}
+
+                <div className="flex gap-3 mt-8">
+                  <button
+                    onClick={handleSuggest}
+                    disabled={suggesting || !systemDescription.trim()}
+                    className="px-6 py-2 text-xs tracking-[0.2em] border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent-glow)] disabled:opacity-30 transition-colors"
+                  >
+                    {suggesting ? "CONSULTING ORACLE..." : "SUGGEST GUARDIANS"}
+                  </button>
+                  <button
+                    onClick={handleSkipSuggest}
+                    className="px-6 py-2 text-xs tracking-[0.2em] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    SKIP — CHOOSE MANUALLY
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ════ STEP 2: CHOOSE GUARDIANS ════ */}
+            {modal === 2 && (
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] tracking-[0.3em] mb-1">II</p>
+                <h2 className="text-xl text-[var(--text-primary)] mb-1">The Fates</h2>
+                <p className="text-xs text-[var(--text-secondary)] mb-6">Select your guardians. Click to enable or disable.</p>
+
+                {suggestions.length > 0 && (
+                  <p className="text-[10px] text-[var(--accent)] tracking-[0.2em] mb-4">
+                    {"\u2726"} AI-suggested guardians are pre-selected
+                  </p>
+                )}
+
+                {/* Dependency warnings */}
+                {getDependencyWarnings().map((w, i) => (
+                  <p key={i} className="text-[var(--warning)] text-xs mb-2">{"\u26A0"} {w}</p>
+                ))}
+
+                <div className="space-y-6">
+                  {groupedChecks.map((group) => (
+                    <div key={group.category}>
+                      <p className="text-[10px] text-[var(--text-muted)] tracking-[0.3em] mb-3">{"\u2500\u2500\u2500"} {group.label} {"\u2500\u2500\u2500"}</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {group.checks.map((check) => {
+                          const enabled = enabledChecks.has(check.id);
+                          const suggested = suggestions.some((s) => s.checkId === check.id);
+                          return (
+                            <button
+                              key={check.id}
+                              onClick={() => toggleCheck(check.id)}
+                              className={`relative text-left border rounded-sm p-4 transition-all duration-200
+                                ${enabled
+                                  ? "border-[var(--accent)] bg-[var(--accent-glow)]"
+                                  : "border-[var(--border)] bg-[var(--bg-secondary)] hover:border-[var(--border-bright)]"
+                                }
+                                ${suggested && !enabled ? "ring-1 ring-[var(--accent)]/30" : ""}
+                              `}
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <div>
+                                  <span className="text-[10px] text-[var(--text-muted)] mr-2">{check.numeral}</span>
+                                  <span className={`text-sm font-medium ${enabled ? "text-[var(--accent)]" : "text-[var(--text-primary)]"}`}>
+                                    {check.mythName}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {check.isHardFail && (
+                                    <span className="text-[8px] tracking-[0.15em] text-[var(--danger)] border border-[var(--danger)]/30 px-1 py-0.5 rounded-sm">ASSERT</span>
+                                  )}
+                                  <span className={`text-lg ${enabled ? "text-[var(--accent)]" : "text-[var(--text-muted)]"}`}>
+                                    {enabled ? "\u25C9" : "\u25CB"}
+                                  </span>
+                                </div>
+                              </div>
+                              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">{check.description}</p>
+                              {suggested && (
+                                <p className="text-[9px] text-[var(--accent)]/60 mt-1">{"\u2726"} suggested</p>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between items-center mt-8 pt-4 border-t border-[var(--border)]">
+                  <button onClick={() => transitionTo(1)} className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]">{"\u2190"} Back</button>
+                  <div className="text-xs text-[var(--text-muted)]">{enabledChecks.size} guardian{enabledChecks.size !== 1 ? "s" : ""} selected</div>
+                  <button
+                    onClick={() => enabledChecks.size > 0 && transitionTo(3)}
+                    disabled={enabledChecks.size === 0}
+                    className="px-6 py-2 text-xs tracking-[0.2em] border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent-glow)] disabled:opacity-30 transition-colors"
+                  >
+                    CONFIGURE {"\u2192"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ════ STEP 3: CONFIGURE PARAMS ════ */}
+            {modal === 3 && (
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] tracking-[0.3em] mb-1">III</p>
+                <h2 className="text-xl text-[var(--text-primary)] mb-1">The Scribe</h2>
+                <p className="text-xs text-[var(--text-secondary)] mb-6">Set parameters for each guardian. These define your system's rules.</p>
+
+                <div className="space-y-4">
+                  {[...enabledChecks].map((id) => {
+                    const check = allChecks.find((c) => c.id === id);
+                    if (!check) return null;
+                    const hasParams = check.publicParams.length > 0;
+
+                    return (
+                      <div key={id} className="border border-[var(--border)] rounded-sm bg-[var(--bg-secondary)]">
+                        <div className="p-4 border-b border-[var(--border)]">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-[var(--text-muted)]">{check.numeral}</span>
+                            <span className="text-sm text-[var(--accent)]">{check.mythName}</span>
+                            {!hasParams && <span className="text-[10px] text-[var(--text-muted)]">{"\u2014"} no parameters needed</span>}
+                          </div>
+                          <p className="text-[11px] text-[var(--text-secondary)] mt-1">{check.description}</p>
+                        </div>
+                        {hasParams && (
+                          <div className="p-4 space-y-3">
+                            {check.publicParams.map((param) => (
+                              <div key={param.name} className="flex items-center gap-4">
+                                <div className="w-1/3">
+                                  <label className="text-[10px] text-[var(--text-muted)] tracking-[0.15em]">
+                                    {param.name}
+                                    {param.required && <span className="text-[var(--danger)] ml-1">*</span>}
+                                  </label>
+                                  <p className="text-[9px] text-[var(--text-muted)]/60">{param.description}</p>
+                                </div>
+                                <input
+                                  value={checkParams[id]?.[param.name] || ""}
+                                  onChange={(e) => setParam(id, param.name, e.target.value)}
+                                  className="flex-1 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-sm px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                                  placeholder={param.type === "Bytes32" ? "0x..." : "e.g., 100"}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {compileError && (
+                  <pre className="mt-4 p-3 bg-[var(--bg-tertiary)] border border-[var(--danger)]/30 rounded-sm text-[var(--danger)] text-xs whitespace-pre-wrap">{compileError}</pre>
+                )}
+
+                <div className="flex justify-between items-center mt-8 pt-4 border-t border-[var(--border)]">
+                  <button onClick={() => transitionTo(2)} className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]">{"\u2190"} Back</button>
+                  <button
+                    onClick={handleCompile}
+                    className="px-6 py-2 text-xs tracking-[0.2em] border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent-glow)] transition-colors"
+                  >
+                    COMPILE {"\u2192"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ════ STEP 4: REVIEW ════ */}
+            {modal === 4 && (
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] tracking-[0.3em] mb-1">IV</p>
+                <h2 className="text-xl text-[var(--text-primary)] mb-1">The Eye</h2>
+                <p className="text-xs text-[var(--text-secondary)] mb-6">Review the deterministically compiled Compact circuit.</p>
+
+                <div className="mb-4 p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-sm">
+                  <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-2">ACTIVE GUARDIANS</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[...enabledChecks].map((id) => {
+                      const check = allChecks.find((c) => c.id === id);
+                      return (
+                        <span key={id} className="text-[10px] tracking-[0.15em] text-[var(--accent)] border border-[var(--accent)]/30 px-2 py-0.5 rounded-sm">
+                          {check?.numeral} {check?.mythName}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* VCL source */}
+                <details className="mb-4">
+                  <summary className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] cursor-pointer hover:text-[var(--text-secondary)]">VCL SOURCE</summary>
+                  <pre className="mt-2 p-3 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-sm text-xs text-[var(--text-secondary)] overflow-x-auto max-h-40">{vcl}</pre>
+                </details>
+
+                {/* Compact output */}
+                <div>
+                  <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-2">COMPILED COMPACT</p>
+                  <pre className="p-4 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-sm text-xs text-[var(--text-secondary)] overflow-auto max-h-96 leading-relaxed">
+                    {compact.split("\n").map((line, i) => (
+                      <div key={i} className="flex">
+                        <span className="text-[var(--text-muted)]/30 w-8 text-right mr-3 select-none">{i + 1}</span>
+                        <span>{line}</span>
+                      </div>
+                    ))}
+                  </pre>
+                </div>
+
+                <div className="flex justify-between items-center mt-8 pt-4 border-t border-[var(--border)]">
+                  <button onClick={() => transitionTo(3)} className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]">{"\u2190"} Back</button>
+                  <button
+                    onClick={handleDeploy}
+                    disabled={deploying}
+                    className="px-6 py-2 text-xs tracking-[0.2em] border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent-glow)] disabled:opacity-30 transition-colors"
+                  >
+                    {deploying ? "DEPLOYING..." : "DEPLOY TO MIDNIGHT \u2192"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ════ STEP 5: RESULT ════ */}
+            {modal === 5 && deployResult && (
+              <div className="text-center">
+                <p className="text-[10px] text-[var(--text-muted)] tracking-[0.3em] mb-1">V</p>
+                <h2 className="text-xl text-[var(--text-primary)] mb-1">The Architect</h2>
+                <p className="text-xs text-[var(--accent)] mb-8">{"\u2726"} Ruleset deployed successfully</p>
+
+                <div className="text-left space-y-3 mb-8">
+                  <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-sm">
+                    <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-1">CONTRACT ADDRESS</p>
+                    <p className="text-xs text-[var(--text-primary)] font-mono break-all">{deployResult.contractAddress}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-sm">
+                      <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-1">NAME</p>
+                      <p className="text-xs text-[var(--text-primary)]">{deployResult.name}</p>
+                    </div>
+                    <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-sm">
+                      <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-1">GUARDIANS</p>
+                      <p className="text-xs text-[var(--text-primary)]">{deployResult.checkCount || enabledChecks.size}</p>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-sm">
+                    <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-1">SDK</p>
+                    <pre className="text-xs text-[var(--accent)] whitespace-pre-wrap">{deployResult.sdk}</pre>
+                  </div>
+                </div>
+
+                <button onClick={resetAll} className="px-6 py-2 text-xs tracking-[0.2em] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+                  DEPLOY ANOTHER
+                </button>
+              </div>
+            )}
+
+            {error && modal !== 1 && <p className="text-[var(--danger)] text-xs mt-4">{error}</p>}
           </div>
         </div>
       )}
 
-      {/* ═══════ MODAL OVERLAY ═══════ */}
-      {modal > 0 && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{
-            transition: "background 0.35s ease",
-            background: modalVisible
-              ? "rgba(0, 0, 0, 0.85)"
-              : "rgba(0, 0, 0, 0)",
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !transitioning) closeModal();
-          }}
-        >
-          {/* ── MODAL 1: DEFINE ── */}
-          {modal === 1 && (
-            <div
-              className="relative w-full max-w-2xl mx-4"
-              style={{
-                transition:
-                  "opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
-                opacity: modalVisible ? 1 : 0,
-                transform: modalVisible
-                  ? "translateY(0) scale(1)"
-                  : "translateY(24px) scale(0.97)",
-              }}
-            >
-              {/* Corner accents */}
-              <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-[var(--accent)]" />
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-[var(--accent)]" />
-
-              <div className="border border-[var(--border-bright)] bg-[var(--bg-primary)]">
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 flex items-center justify-center text-[10px] font-bold border border-white text-white">
-                      1
-                    </span>
-                    <span className="text-[11px] uppercase tracking-[0.15em] text-white font-bold">
-                      Define Rules
-                    </span>
-                  </div>
-                  <button
-                    onClick={closeModal}
-                    className="text-[var(--text-muted)] hover:text-white text-xs cursor-pointer transition-colors"
-                  >
-                    ESC
-                  </button>
+      {/* Previously deployed rulesets */}
+      {rulesets.length > 0 && (
+        <div className="max-w-6xl mx-auto">
+          <p className="text-[10px] text-[var(--text-muted)] tracking-[0.3em] mb-4">YOUR RULESETS</p>
+          <div className="grid grid-cols-3 gap-4">
+            {rulesets.map((rs: any, i: number) => (
+              <div key={rs.address || i} className="border border-[var(--border)] rounded-sm p-4 bg-[var(--bg-secondary)] hover:border-[var(--border-bright)] transition-colors">
+                <p className="text-sm text-[var(--text-primary)] mb-1">{rs.name}</p>
+                <p className="text-[10px] text-[var(--text-muted)] font-mono mb-2">{rs.address?.slice(0, 16)}...</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {(rs.tags || [rs.category]).filter(Boolean).map((tag: string) => (
+                    <span key={tag} className="text-[8px] tracking-[0.15em] text-[var(--text-muted)] border border-[var(--border)] px-1.5 py-0.5 rounded-sm">{tag}</span>
+                  ))}
+                  <span className="text-[8px] text-[var(--text-muted)]">{rs.checkCount || 10} guardians</span>
                 </div>
-
-                {/* Body */}
-                <div className="p-5 space-y-4">
-                  {/* Rules textarea */}
-                  <div className="border border-[var(--border)] bg-[var(--bg-secondary)]">
-                    <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border)]">
-                      <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                        Rules · English
-                      </span>
-                      <span className="text-[10px] text-[var(--text-muted)]">
-                        {rules.trim().split("\n").filter(Boolean).length} rules
-                      </span>
-                    </div>
-                    <textarea
-                      value={rules}
-                      onChange={(e) => setRules(e.target.value)}
-                      className="w-full bg-transparent p-4 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none outline-none h-44 font-mono"
-                      placeholder={`Players cannot move faster than 5 units per tick\nCards must be in the player's hand before playing\nRNG must be committed before the bet is placed`}
-                      autoFocus
-                    />
-                  </div>
-
-                  {/* Metadata row */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="border border-[var(--border)] bg-[var(--bg-secondary)]">
-                      <div className="px-3 py-1.5 border-b border-[var(--border)]">
-                        <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                          Ruleset Name
-                        </span>
-                      </div>
-                      <input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none font-mono"
-                        placeholder="my-ruleset"
-                      />
-                    </div>
-                    <div className="border border-[var(--border)] bg-[var(--bg-secondary)]">
-                      <div className="px-3 py-1.5 border-b border-[var(--border)]">
-                        <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                          Category
-                        </span>
-                      </div>
-                      <input
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                        className="w-full bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none font-mono"
-                        placeholder="e.g. card-game, fps, moba"
-                      />
-                    </div>
-                  </div>
-                  <div className="border border-[var(--border)] bg-[var(--bg-secondary)]">
-                    <div className="px-3 py-1.5 border-b border-[var(--border)]">
-                      <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-                        Description
-                      </span>
-                    </div>
-                    <input
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      className="w-full bg-transparent px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none font-mono"
-                      placeholder="What does this ruleset enforce?"
-                    />
-                  </div>
-
-                  {/* Error */}
-                  {error && (
-                    <div className="px-4 py-2 border border-[var(--danger)] bg-[rgba(255,51,51,0.05)] text-xs text-[var(--danger)]">
-                      {error}
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--border)]">
-                  <button
-                    onClick={handleLoadExample}
-                    className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all cursor-pointer"
-                  >
-                    Load Example
-                  </button>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={closeModal}
-                      className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-all cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleCompile}
-                      disabled={compiling || !rules.trim()}
-                      className={`btn-brutal px-5 py-2.5 text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer ${
-                        compiling || !rules.trim()
-                          ? "bg-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
-                          : "bg-white text-black hover:bg-[var(--text-primary)]"
-                      }`}
-                    >
-                      {compiling ? (
-                        <span className="flex items-center gap-2">
-                          <span className="inline-block w-3 h-3 border border-black border-t-transparent rounded-full animate-spin" />
-                          Compiling & Validating...
-                        </span>
-                      ) : (
-                        "Compile →"
-                      )}
-                    </button>
-                  </div>
+                <div className="flex gap-3 mt-2 text-[10px] text-[var(--text-muted)]">
+                  <span>{rs.totalChecks || 0} proofs</span>
+                  <span>{rs.flaggedRate || "0.00%"} flagged</span>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* ── MODAL 2: REVIEW ── */}
-          {modal === 2 && (
-            <div
-              className="relative w-full max-w-3xl mx-4"
-              style={{
-                transition:
-                  "opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
-                opacity: modalVisible ? 1 : 0,
-                transform: modalVisible
-                  ? "translateY(0) scale(1)"
-                  : "translateY(24px) scale(0.97)",
-              }}
-            >
-              <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-[var(--warning)]" />
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-[var(--warning)]" />
-
-              <div className="border border-[var(--border-bright)] bg-[var(--bg-primary)]">
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 flex items-center justify-center text-[10px] font-bold border border-[var(--warning)] text-[var(--warning)]">
-                      2
-                    </span>
-                    <span className="text-[11px] uppercase tracking-[0.15em] text-white font-bold">
-                      Review Compact
-                    </span>
-                    <span className="text-[10px] text-[var(--text-muted)] ml-2">
-                      {compact.split("\n").length} lines
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setEditMode(!editMode)}
-                      className={`text-[10px] uppercase tracking-wider transition-colors cursor-pointer ${
-                        editMode ? "text-[var(--warning)]" : "text-[var(--text-muted)] hover:text-white"
-                      }`}
-                    >
-                      {editMode ? "View" : "Edit"}
-                    </button>
-                    <button
-                      onClick={async () => {
-                        setValidating(true);
-                        try {
-                          // Phase 1: Local validation
-                          const res = await fetch("/api/validate", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ compact: editedCompact || compact }),
-                          });
-                          const data = await res.json();
-
-                          if (data.valid) {
-                            setValidationErrors([]);
-                            setNeedsHumanReview(false);
-                            return;
-                          }
-
-                          const hasRealErrors = (data.errors || []).some((e: any) => e.severity === "error");
-                          if (!hasRealErrors) {
-                            setValidationErrors(data.errors || []);
-                            setNeedsHumanReview(false);
-                            return;
-                          }
-
-                          // Phase 2: AI fix — send only broken chunk + errors
-                          setValidationErrors(data.errors || []);
-                          setAiFixing(true);
-
-                          const fixRes = await fetch("/api/fix", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              compact: editedCompact || compact,
-                              errors: data.errors,
-                              scaffoldEndLine,
-                            }),
-                          });
-                          const fixData = await fixRes.json();
-
-                          if (fixRes.ok && fixData.compact) {
-                            setCompact(fixData.compact);
-                            setEditedCompact(fixData.compact);
-                            setValidationErrors(fixData.validation || []);
-                            const stillHasErrors = (fixData.validation || []).some(
-                              (e: any) => e.severity === "error"
-                            );
-                            setNeedsHumanReview(stillHasErrors);
-                          }
-                        } catch {} finally {
-                          setValidating(false);
-                          setAiFixing(false);
-                        }
-                      }}
-                      disabled={validating || aiFixing}
-                      className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer"
-                    >
-                      {aiFixing ? "Fixing..." : validating ? "Checking..." : "Re-validate"}
-                    </button>
-                    {(editedCompact || compact) && (
-                      <button
-                        onClick={() => navigator.clipboard.writeText(editedCompact || compact)}
-                        className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer"
-                      >
-                        Copy
-                      </button>
-                    )}
-                    <button
-                      onClick={closeModal}
-                      className="text-[var(--text-muted)] hover:text-white text-xs cursor-pointer transition-colors"
-                    >
-                      ESC
-                    </button>
-                  </div>
-                </div>
-
-                {/* Validation status bar */}
-                {validationErrors.length > 0 && (
-                  <div className={`px-5 py-2 border-b border-[var(--border)] text-[10px] uppercase tracking-wider ${
-                    validationErrors.some((e: any) => e.severity === "error")
-                      ? "bg-[rgba(255,51,51,0.05)] text-[var(--danger)]"
-                      : "bg-[rgba(255,170,0,0.05)] text-[var(--warning)]"
-                  }`}>
-                    {needsHumanReview && (
-                      <div className="mb-1 font-bold normal-case tracking-normal text-[11px]">
-                        Auto-fix failed after {compileAttempts} attempts. Please review and fix the issues below.
-                      </div>
-                    )}
-                    {validationErrors.map((e: any, i: number) => (
-                      <div key={i} className="py-0.5">
-                        <span className="opacity-60">L{e.line}:</span> {e.message}
-                        {e.severity === "warning" && <span className="ml-1 opacity-50">(warning)</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {validationErrors.length === 0 && compact && (
-                  <div className="px-5 py-2 border-b border-[var(--border)] bg-[rgba(0,255,65,0.03)] text-[10px] uppercase tracking-wider text-[var(--accent)]">
-                    All validation checks passed
-                  </div>
-                )}
-
-                {/* Code body */}
-                <div className="p-0">
-                  {editMode ? (
-                    <textarea
-                      value={editedCompact}
-                      onChange={(e) => setEditedCompact(e.target.value)}
-                      className="w-full p-5 text-xs leading-relaxed font-mono bg-transparent text-[var(--text-primary)] border-none outline-none resize-none min-h-[40vh] max-h-[50vh] overflow-y-auto"
-                      spellCheck={false}
-                    />
-                  ) : (
-                    <pre className="p-5 text-xs leading-relaxed overflow-x-auto max-h-[50vh] overflow-y-auto">
-                      <code>
-                        {(editedCompact || compact).split("\n").map((line, i) => {
-                          const lineErrors = validationErrors.filter((e: any) => e.line === i + 1);
-                          return (
-                            <div key={i} className={`flex transition-colors ${
-                              lineErrors.length > 0
-                                ? lineErrors.some((e: any) => e.severity === "error")
-                                  ? "bg-[rgba(255,51,51,0.08)]"
-                                  : "bg-[rgba(255,170,0,0.06)]"
-                                : "hover:bg-[var(--bg-hover)]"
-                            }`}>
-                              <span className="w-8 text-right pr-3 text-[var(--text-muted)] select-none shrink-0">
-                                {i + 1}
-                              </span>
-                              <span
-                                className={
-                                  lineErrors.some((e: any) => e.severity === "error")
-                                    ? "text-[var(--danger)]"
-                                    : line.trimStart().startsWith("//")
-                                    ? "text-[var(--text-muted)]"
-                                    : line.includes("export") ||
-                                      line.includes("pragma") ||
-                                      line.includes("import")
-                                    ? "text-[var(--accent-dim)]"
-                                    : line.includes("assert")
-                                    ? "text-[var(--warning)]"
-                                    : "text-[var(--text-primary)]"
-                                }
-                              >
-                                {line || "\u00A0"}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </code>
-                    </pre>
-                  )}
-                </div>
-
-                {/* Source rules summary */}
-                <div className="px-5 py-3 border-t border-[var(--border)] bg-[var(--bg-secondary)]">
-                  <span className="text-[9px] uppercase tracking-wider text-[var(--text-muted)] block mb-1">
-                    Source Rules
-                  </span>
-                  <p className="text-[11px] text-[var(--text-secondary)] font-mono leading-relaxed">
-                    {rules
-                      .trim()
-                      .split("\n")
-                      .filter(Boolean)
-                      .map((r, i) => `${i + 1}. ${r}`)
-                      .join(" · ")}
-                  </p>
-                </div>
-
-                {/* Error */}
-                {error && (
-                  <div className="mx-5 mb-3 px-4 py-2 border border-[var(--danger)] bg-[rgba(255,51,51,0.05)] text-xs text-[var(--danger)]">
-                    {error}
-                  </div>
-                )}
-
-                {/* Footer */}
-                <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--border)]">
-                  <button
-                    onClick={() => transitionTo(1)}
-                    className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all cursor-pointer"
-                  >
-                    ← Edit Rules
-                  </button>
-                  <div className="flex items-center gap-3">
-                    {!name.trim() && (
-                      <span className="text-[10px] text-[var(--warning)] uppercase tracking-wider">
-                        Name required
-                      </span>
-                    )}
-                    {validationErrors.some((e: any) => e.severity === "error") && (
-                      <span className="text-[10px] text-[var(--danger)] uppercase tracking-wider">
-                        Fix errors first
-                      </span>
-                    )}
-                    <button
-                      onClick={handleDeploy}
-                      disabled={deploying || !name.trim() || validationErrors.some((e: any) => e.severity === "error")}
-                      className={`btn-brutal px-5 py-2.5 text-[11px] uppercase tracking-wider font-bold transition-all cursor-pointer ${
-                        deploying || !name.trim() || validationErrors.some((e: any) => e.severity === "error")
-                          ? "bg-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
-                          : "bg-white text-black hover:bg-[var(--text-primary)]"
-                      }`}
-                    >
-                      {deploying ? (
-                        <span className="flex items-center gap-2">
-                          <span className="inline-block w-3 h-3 border border-black border-t-transparent rounded-full animate-spin" />
-                          Deploying...
-                        </span>
-                      ) : (
-                        "Deploy to Midnight →"
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── MODAL 3: DEPLOY RESULT ── */}
-          {modal === 3 && deployResult && (
-            <div
-              className="relative w-full max-w-2xl mx-4"
-              style={{
-                transition:
-                  "opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
-                opacity: modalVisible ? 1 : 0,
-                transform: modalVisible
-                  ? "translateY(0) scale(1)"
-                  : "translateY(24px) scale(0.97)",
-              }}
-            >
-              <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-[var(--accent)]" />
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-[var(--accent)]" />
-
-              <div
-                className="border border-[var(--accent)] bg-[var(--bg-primary)]"
-                style={{
-                  boxShadow: "0 0 60px rgba(0, 255, 65, 0.08), 0 0 120px rgba(0, 255, 65, 0.04)",
-                }}
-              >
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--accent)] bg-[var(--accent-glow)]">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 flex items-center justify-center text-[10px] font-bold border border-[var(--accent)] text-[var(--accent)]">
-                      ✓
-                    </span>
-                    <span className="text-[11px] uppercase tracking-[0.15em] text-[var(--accent)] font-bold">
-                      Deployed Successfully
-                    </span>
-                  </div>
-                  <button
-                    onClick={closeModal}
-                    className="text-[var(--text-muted)] hover:text-white text-xs cursor-pointer transition-colors"
-                  >
-                    ESC
-                  </button>
-                </div>
-
-                {/* Details */}
-                <div className="p-5 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    {[
-                      { label: "CONTRACT", value: deployResult.contractAddress },
-                      { label: "TX HASH", value: deployResult.txHash },
-                      { label: "NETWORK", value: deployResult.network },
-                      {
-                        label: "DEPLOYED AT",
-                        value: new Date(
-                          deployResult.deployedAt
-                        ).toLocaleString(),
-                      },
-                    ].map((item) => (
-                      <div
-                        key={item.label}
-                        className="border border-[var(--border)] bg-[var(--bg-secondary)] p-3"
-                      >
-                        <span className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider block mb-1">
-                          {item.label}
-                        </span>
-                        <span className="text-[11px] text-[var(--text-primary)] font-mono break-all">
-                          {item.value}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="dither-sep" />
-
-                  {/* SDK Snippet */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider">
-                        SDK SNIPPET
-                      </span>
-                      <button
-                        onClick={() =>
-                          navigator.clipboard.writeText(deployResult.sdk)
-                        }
-                        className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer"
-                      >
-                        Copy
-                      </button>
-                    </div>
-                    <pre className="text-xs text-[var(--text-primary)] leading-relaxed bg-[var(--bg-secondary)] p-4 border border-[var(--border)] max-h-48 overflow-y-auto">
-                      {deployResult.sdk}
-                    </pre>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--border)]">
-                  <button
-                    onClick={() => transitionTo(2)}
-                    className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all cursor-pointer"
-                  >
-                    ← View Code
-                  </button>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={closeModal}
-                      className="btn-brutal px-4 py-2 text-[11px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-all cursor-pointer"
-                    >
-                      Close
-                    </button>
-                    <button
-                      onClick={resetAll}
-                      className="btn-brutal px-5 py-2.5 text-[11px] uppercase tracking-wider font-bold bg-white text-black hover:bg-[var(--text-primary)] transition-all cursor-pointer"
-                    >
-                      Deploy Another
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       )}
     </div>

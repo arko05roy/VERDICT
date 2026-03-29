@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDeployedRulesets, getContractState } from "../../../lib/midnight";
+import { getDeployedRulesets, getContractState } from "@/lib/midnight";
 
 const INDEXER_URL =
   process.env.MIDNIGHT_INDEXER_URL || "http://127.0.0.1:8088/api/v3/graphql";
@@ -30,15 +30,12 @@ export async function GET() {
     const block = await getLatestBlock();
     const rulesets = getDeployedRulesets();
 
-    // Build feed from deployed rulesets + their on-chain state
     const entries = await Promise.all(
       rulesets.map(async (rs) => {
         let state = null;
         try {
           state = await getContractState(rs.address);
-        } catch {
-          // Contract state may not be queryable yet
-        }
+        } catch {}
         const totalChecks = state ? Number(state.totalChecks) : 0;
         const totalFlagged = state ? Number(state.totalFlagged) : 0;
         const lastVerdict = state
@@ -47,17 +44,22 @@ export async function GET() {
             : "FLAGGED"
           : "PENDING";
 
+        const checkCount = rs.checkCount || 10;
+        const checksDisplay =
+          lastVerdict === "CLEAN"
+            ? `${checkCount}/${checkCount}`
+            : lastVerdict === "FLAGGED"
+              ? `${checkCount - 1}/${checkCount}`
+              : "\u2014";
+
         return {
           ruleset: rs.name,
           address: rs.address,
           player: rs.address.slice(0, 10) + "...",
           verdict: lastVerdict,
-          checks:
-            lastVerdict === "CLEAN"
-              ? "10/10"
-              : lastVerdict === "FLAGGED"
-                ? "9/10"
-                : "—",
+          checks: checksDisplay,
+          checkCount,
+          enabledChecks: rs.enabledChecks || [],
           totalChecks,
           totalFlagged,
           time: rs.deployedAt,
@@ -86,7 +88,7 @@ export async function GET() {
         rulesetCount: 0,
         error: err?.message,
       },
-      { status: 200 } // Don't fail the feed — just return empty
+      { status: 200 }
     );
   }
 }

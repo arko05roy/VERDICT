@@ -14,19 +14,21 @@
 
 1. [The Problem](#1-the-problem)
 2. [What VERDICT Does](#2-what-verdict-does)
-3. [Architecture](#3-architecture)
-4. [The 10-Check Framework](#4-the-10-check-framework)
-   - [Category 1: Cryptographic Integrity](#category-1-cryptographic-integrity-checks-1-2)
-   - [Category 2: Rate-of-Change Violations](#category-2-rate-of-change-violations-checks-3-4)
-   - [Category 3: Boundary Enforcement](#category-3-boundary-enforcement-check-5)
-   - [Category 4: Action Legitimacy](#category-4-action-legitimacy-checks-6-7)
-   - [Category 5: Statistical & Information-Theoretic](#category-5-statistical--information-theoretic-checks-8-10)
-5. [Why These 10?](#5-why-these-10)
-6. [Why Midnight?](#6-why-midnight)
-7. [On-Chain State](#7-on-chain-state)
-8. [Integration](#8-integration)
-9. [Test Results](#9-test-results)
-10. [Design Decisions](#10-design-decisions)
+3. [The Guardians](#3-the-guardians)
+4. [Architecture](#4-architecture)
+5. [VCL — Verdict Compile Language](#5-vcl--verdict-compile-language)
+6. [The Check Framework](#6-the-check-framework)
+   - [Category 1: Cryptographic Integrity](#category-1-cryptographic-integrity)
+   - [Category 2: Rate-of-Change Violations](#category-2-rate-of-change-violations)
+   - [Category 3: Boundary Enforcement](#category-3-boundary-enforcement)
+   - [Category 4: Action Legitimacy](#category-4-action-legitimacy)
+   - [Category 5: Statistical & Information-Theoretic](#category-5-statistical--information-theoretic)
+7. [Governance — The VERDICT DAO](#7-governance--the-verdict-dao)
+8. [Why Midnight?](#8-why-midnight)
+9. [On-Chain State](#9-on-chain-state)
+10. [Integration](#10-integration)
+11. [Test Results](#11-test-results)
+12. [Design Decisions](#12-design-decisions)
 
 ---
 
@@ -52,17 +54,46 @@ VERDICT is a **universal ZK integrity protocol** built on Midnight. It doesn't r
 
 > **Was this state transition valid?**
 
-Any system that processes state transitions — games, exchanges, insurance, lending, compliance — can plug into VERDICT. The system defines its rules as parameters. VERDICT runs **10 mathematical checks** inside a ZK circuit per transition. The proof settles on Midnight. The data stays private. The verdict is public.
+Any system that processes state transitions can plug into VERDICT. The system selects which checks — called **Guardians** — apply to its domain, configures their parameters, and deploys a custom ZK circuit through **VCL (Verdict Compile Language)**. The proof settles on Midnight. The data stays private. The verdict is public.
 
 `CLEAN` or `FLAGGED`. That's it.
 
 VERDICT is infrastructure. Like Chainlink doesn't build your oracle — it provides the oracle network. Like The Graph doesn't build your subgraph — it provides the indexing protocol. VERDICT doesn't build your system. It provides the integrity layer.
 
-Every system gets its own **ruleset** — a deployed Compact contract on Midnight with its own parameters. Different rules, same verification engine. Insurance claim processing, exchange trade execution, game anti-cheat, lending compliance — each is a deployed ruleset. You don't build a new system per use case. You deploy a ruleset.
+Every system gets its own **ruleset** — a deployed Compact contract on Midnight containing only the Guardians it needs. A financial exchange might use Mnemosyne (hash-chain), Styx (commit-reveal), Hermes (rate limits), and Terminus (boundaries). A game might use all ten. An IoT system might use three. Different rules, same verification engine. You don't build a new system per use case. You compose a ruleset from the Guardian library.
+
+The Guardian library is governed by an on-chain DAO. Anyone can propose new Guardians. The council votes. Accepted Guardians enter the protocol. The library grows with the community.
 
 ---
 
-## 3. Architecture
+## 3. The Guardians
+
+Each check in VERDICT is a **Guardian** — a pre-audited, mathematically proven verification primitive named after figures from Greek and Roman mythology. Guardians are the building blocks of any ruleset.
+
+| # | Guardian | Category | What it proves |
+|---|----------|----------|----------------|
+| I | **Mnemosyne** | Integrity | History chain — no state can be fabricated or replayed |
+| II | **Styx** | Integrity | Oath binding — actions committed before outcomes revealed |
+| III | **Hermes** | Rate Limit | First-order rate — state cannot change faster than allowed |
+| IV | **Phaethon** | Rate Limit | Second-order rate — acceleration cannot exceed limits |
+| V | **Terminus** | Boundary | Boundary enforcement — state must stay within valid ranges |
+| VI | **Themis** | Validity | Action legitimacy — only defined operations are permitted |
+| VII | **Chronos** | Validity | Time-window frequency — actions cannot exceed rate per window |
+| VIII | **Moirai** | Behavioral | Pattern entropy — behavior must show natural diversity |
+| IX | **Daedalus** | Behavioral | Precision anomaly — detects inhuman accuracy patterns |
+| X | **Prometheus** | Information | Knowledge leakage — detects correlation with hidden data |
+
+Guardians I-II use `assert` — hard failures where no valid proof can be generated. Guardians III-X use soft flags that aggregate into the final verdict. Tampered data is *unprovable*. Rule violations are *provable and recordable*.
+
+Every Guardian is:
+- **Pre-audited** — the Compact code template is written once, tested, and frozen
+- **Composable** — select any subset for your ruleset
+- **Parameterized** — configure thresholds for your domain
+- **Privacy-preserving** — all data enters as private witnesses, only the verdict is public
+
+---
+
+## 4. Architecture
 
 ```
 SYSTEM RUNTIME (zero latency impact)       ASYNC ZK SETTLEMENT (background)
@@ -112,7 +143,53 @@ Checks 1 and 2 use `assert` — hard failures where no valid proof can be genera
 
 ---
 
-## 4. The 10-Check Framework
+## 5. VCL — Verdict Compile Language
+
+VCL is the declaration layer between human intent and ZK circuits. It is **not** a programming language — it's a configuration format that maps 1:1 to pre-audited Compact code templates.
+
+### The Problem VCL Solves
+
+Previous approaches used AI to generate Compact circuit code from English descriptions. This created a trust gap: even with self-checking and validation, AI-generated code can be wrong. In a zero-knowledge integrity protocol, "probably correct" is not acceptable.
+
+VCL eliminates this entirely. AI's only role is to *suggest* which Guardians to enable — a recommendation you can fully override. The actual code generation is deterministic: VCL declarations map to pre-audited Compact templates with zero ambiguity.
+
+### Syntax
+
+```vcl
+version 1.0
+
+use Mnemosyne {}
+use Styx {}
+use Hermes {
+  maxVelocity: 5
+}
+use Terminus {
+  boundX: 1000
+  boundY: 1000
+}
+use Prometheus {
+  maxCorrelation: 50
+  enemyPosHashPublic: 0x...
+}
+```
+
+Each `use` block selects a Guardian and provides its parameters. The compiler:
+1. Unions all witness requirements from selected Guardians
+2. Unions all ledger fields
+3. Includes shared helpers (e.g., `absDiff`) only if needed
+4. Emits `startSession` / `commitMove` circuits only if Mnemosyne / Styx are selected
+5. Assembles `verifyTransition` with only the selected check templates
+6. Generates the aggregation logic for soft-fail Guardians
+
+The output is valid Compact source code — deterministic, auditable, and identical every time for the same VCL input.
+
+### What This Means
+
+A ruleset selecting 3 Guardians produces a smaller circuit than one selecting 10. Fewer constraints = faster proving. The protocol scales down to the minimum viable integrity check for each domain.
+
+---
+
+## 6. The Check Framework
 
 Every rule-based system follows the same pattern: take an input state, apply rules, produce an output state. Instead of building bespoke verification for every domain, VERDICT consolidates the entire problem space into 10 mathematical checks that cover the fundamental taxonomy of state transition violations.
 
@@ -318,7 +395,45 @@ Information leakage has a behavioral signature: the actor moves toward things th
 
 ---
 
-## 5. Why These 10?
+## 7. Governance — The VERDICT DAO
+
+The Guardian library is not static. VERDICT is governed by an on-chain DAO contract deployed on Midnight that manages the check registry.
+
+### Council-Based Governance
+
+Day-0 launches with a council model — a small group of core contributors who vote on new Guardian proposals. The 10 genesis Guardians are pre-registered at deployment.
+
+**On-chain state:**
+- `checkRegistry: Map<Uint<64>, CheckEntry>` — the canonical Guardian registry
+- `council: Set<Bytes<32>>` — council member identities
+- `proposals: Map<Uint<64>, Proposal>` — active VIP proposals
+- `voteThreshold: Uint<64>` — votes needed to pass
+
+### VIP — Verdict Improvement Proposals
+
+Anyone can propose a new Guardian. The flow:
+
+1. **Propose** — Submit a `proposeCheck` transaction with the template hash and check ID
+2. **Vote** — Council members cast votes (`vote` circuit). Double-voting is prevented via a hash-based vote key stored in an on-chain Set.
+3. **Finalize** — If votes meet threshold, the Guardian is registered in `checkRegistry`. Otherwise, rejected.
+
+Each accepted Guardian gets:
+- A mythological name
+- An audited Compact code template
+- A VCL mapping
+- An entry in the on-chain registry
+
+### Why On-Chain?
+
+The check registry lives on Midnight, not in a config file. This means:
+- The frontend reads available Guardians from the chain
+- No single entity controls which checks exist
+- The protocol's evolution is auditable and transparent
+- Adding a Guardian is a governance action, not a deploy
+
+---
+
+## Why These 10?
 
 The 10 checks map to a complete taxonomy of state transition violations:
 
@@ -346,7 +461,7 @@ Different domains customize the parameters. A game sets `maxVelocity = 5`; a tra
 
 ---
 
-## 6. Why Midnight?
+## 8. Why Midnight?
 
 Midnight's Compact language compiles directly to ZK circuits. Privacy isn't bolted on — it's the execution model.
 
@@ -361,7 +476,7 @@ Remove Midnight from VERDICT, and you're back to trusting the system's `console.
 
 ---
 
-## 7. On-Chain State
+## 9. On-Chain State
 
 Each deployed ruleset maintains public ledger state, readable by anyone:
 
@@ -380,7 +495,7 @@ No more trusting platforms when they say "we follow the rules." Show me the proo
 
 ---
 
-## 8. Integration
+## 10. Integration
 
 ### Three Circuits, One Flow
 
@@ -460,7 +575,7 @@ const witnessData: VerdictPrivateState = {
 
 ---
 
-## 9. Test Results
+## 11. Test Results
 
 All 10 checks verified locally via simulator (no devnet required):
 
@@ -481,7 +596,7 @@ cd contract && npx vitest run src/test/verdict.test.ts
 
 ---
 
-## 10. Design Decisions
+## 12. Design Decisions
 
 **Why async settlement?**
 ZK proof generation takes 2-5 seconds. Blocking the system to wait for a proof would be unusable. VERDICT settles asynchronously — the system operates at full speed, violations are flagged retroactively with mathematical certainty.
@@ -500,4 +615,4 @@ Kernel-level approaches (Vanguard, EasyAntiCheat) require OS-level access, work 
 
 ---
 
-*VERDICT. Universal rule integrity. Private by default. Built on Midnight because this is exactly what Midnight was made for.*
+*VERDICT. Universal truth layer. Modular guardians. Governed on-chain. Private by default. Built on Midnight because this is exactly what Midnight was made for.*

@@ -6,31 +6,17 @@ import { useState, useEffect, useMemo, useRef } from "react";
 type Ruleset = {
   address: string;
   name: string;
-  category: string;
   description: string;
+  tags: string[];
+  enabledChecks: string[];
+  checkCount: number;
   deployedAt: string;
   totalChecks: number;
   totalFlagged: number;
   flaggedRate: string;
   status: string;
-};
-
-const ALL_CATEGORIES = [
-  "fps",
-  "card-game",
-  "mmorpg",
-  "turn-based",
-  "casino",
-  "battle-royale",
-];
-
-const CATEGORY_SYMBOLS: Record<string, string> = {
-  fps: "⊕",
-  "card-game": "♠",
-  mmorpg: "⚔",
-  "turn-based": "♟",
-  casino: "♦",
-  "battle-royale": "◎",
+  // Legacy
+  category?: string;
 };
 
 const STATUS_OPTIONS = ["active", "paused", "sealed"];
@@ -46,7 +32,6 @@ const SORT_OPTIONS = [
 export default function ExplorePage() {
   const [rulesets, setRulesets] = useState<Ruleset[]>([]);
   const [search, setSearch] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("newest");
   const [showFilters, setShowFilters] = useState(false);
@@ -68,12 +53,6 @@ export default function ExplorePage() {
     return () => clearInterval(interval);
   }, []);
 
-  const toggleCategory = (cat: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
-    );
-  };
-
   const toggleStatus = (s: string) => {
     setSelectedStatuses((prev) =>
       prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
@@ -81,13 +60,14 @@ export default function ExplorePage() {
   };
 
   const filtered = useMemo(() => {
+    const q = search.toLowerCase();
     let result = rulesets.filter(
       (r) =>
-        (r.name.toLowerCase().includes(search.toLowerCase()) ||
-          r.category.toLowerCase().includes(search.toLowerCase()) ||
-          r.address.toLowerCase().includes(search.toLowerCase())) &&
-        (selectedCategories.length === 0 ||
-          selectedCategories.includes(r.category)) &&
+        (r.name.toLowerCase().includes(q) ||
+          (r.description || "").toLowerCase().includes(q) ||
+          (r.tags || []).some((t: string) => t.toLowerCase().includes(q)) ||
+          (r.category || "").toLowerCase().includes(q) ||
+          r.address.toLowerCase().includes(q)) &&
         (selectedStatuses.length === 0 || selectedStatuses.includes(r.status))
     );
 
@@ -107,10 +87,9 @@ export default function ExplorePage() {
     }
 
     return result;
-  }, [rulesets, search, selectedCategories, selectedStatuses, sortBy]);
+  }, [rulesets, search, selectedStatuses, sortBy]);
 
-  const activeFilterCount =
-    selectedCategories.length + selectedStatuses.length;
+  const activeFilterCount = selectedStatuses.length;
 
   const romanNumerals = [
     "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
@@ -162,7 +141,7 @@ export default function ExplorePage() {
             </svg>
 
             <span className={`flex-1 text-[13px] font-mono tracking-[0.04em] transition-colors duration-300 ${search ? "text-[#e0e0e0]" : "text-[#3a3a3a] group-hover:text-[#666]"}`}>
-              {search || "Seek a ruleset by name, category, or address…"}
+              {search || "Seek a ruleset by name, tag, or address\u2026"}
             </span>
 
             {search ? (
@@ -216,33 +195,6 @@ export default function ExplorePage() {
           />
 
           <div className="relative">
-            {/* Categories */}
-            <div className="mb-5">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-[9px] uppercase tracking-[0.25em] text-[var(--text-muted)]">Category</span>
-                <div className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg, var(--border) 0 2px, transparent 2px 6px)" }} />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {ALL_CATEGORIES.map((cat) => {
-                  const active = selectedCategories.includes(cat);
-                  return (
-                    <button
-                      key={cat}
-                      onClick={() => toggleCategory(cat)}
-                      className={`relative cursor-pointer group/tag transition-all duration-300 px-3 py-1.5 text-[10px] uppercase tracking-[0.15em] border ${
-                        active
-                          ? "border-[var(--accent)] text-[var(--accent)] bg-[rgba(0,255,65,0.05)]"
-                          : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-bright)] hover:text-[var(--text-secondary)]"
-                      }`}
-                    >
-                      <span className="mr-1.5">{CATEGORY_SYMBOLS[cat] || "◈"}</span>
-                      {cat}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* Status */}
             <div className="mb-5">
               <div className="flex items-center gap-2 mb-3">
@@ -297,7 +249,6 @@ export default function ExplorePage() {
               <div className="mt-4 pt-3 border-t border-[var(--border)]">
                 <button
                   onClick={() => {
-                    setSelectedCategories([]);
                     setSelectedStatuses([]);
                   }}
                   className="text-[10px] uppercase tracking-[0.15em] text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors cursor-pointer"
@@ -317,17 +268,6 @@ export default function ExplorePage() {
             <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-muted)]">
               {filtered.length} ruleset{filtered.length !== 1 ? "s" : ""} found
             </span>
-            {/* Active filter tags */}
-            {selectedCategories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => toggleCategory(cat)}
-                className="text-[9px] uppercase tracking-wider text-[var(--accent)] border border-[var(--accent)] px-2 py-0.5 flex items-center gap-1.5 cursor-pointer hover:bg-[rgba(0,255,65,0.05)] transition-colors"
-              >
-                {CATEGORY_SYMBOLS[cat]} {cat}
-                <span className="text-[8px] opacity-60">✕</span>
-              </button>
-            ))}
             {selectedStatuses.map((s) => (
               <button
                 key={s}
@@ -371,7 +311,7 @@ export default function ExplorePage() {
       ) : (
         <div className="max-w-5xl mx-auto grid grid-cols-3 gap-6">
           {filtered.map((r, idx) => {
-            const sym = CATEGORY_SYMBOLS[r.category] || "◈";
+            const checkCount = r.checkCount || 10;
             const numeral = romanNumerals[idx % romanNumerals.length];
 
             return (
@@ -429,16 +369,15 @@ export default function ExplorePage() {
                   <div className="flex-1 h-px bg-[#444]" />
                 </div>
 
-                {/* Category symbol — large center, brighter */}
+                {/* Guardian count — large center */}
                 <div className="absolute top-[48px] left-0 right-0 text-center text-[#555] group-hover:text-[var(--accent)] transition-colors duration-500">
-                  <span className="text-5xl" style={{ textShadow: "0 0 0px transparent" }}
-                    >{sym}</span>
+                  <span className="text-5xl" style={{ textShadow: "0 0 0px transparent" }}>{"\u25C7"}</span>
                 </div>
 
-                {/* Category tag — brighter border */}
+                {/* Guardian count tag */}
                 <div className="absolute top-[108px] left-0 right-0 text-center">
                   <span className="text-[8px] uppercase tracking-[0.2em] text-[#777] border border-[#333] px-2.5 py-0.5 group-hover:border-[var(--accent-dim)] group-hover:text-[var(--accent)] transition-colors">
-                    {r.category}
+                    {checkCount} guardian{checkCount !== 1 ? "s" : ""}
                   </span>
                 </div>
 
@@ -617,7 +556,6 @@ export default function ExplorePage() {
                   </div>
                 ) : (
                   filtered.slice(0, 6).map((r) => {
-                    const sym = CATEGORY_SYMBOLS[r.category] || "◈";
                     return (
                       <Link
                         href={`/explore/${encodeURIComponent(r.address)}`}
@@ -628,12 +566,12 @@ export default function ExplorePage() {
                         onMouseEnter={(e) => (e.currentTarget.style.borderLeftColor = "var(--accent)")}
                         onMouseLeave={(e) => (e.currentTarget.style.borderLeftColor = "transparent")}
                       >
-                        <span className="text-lg text-[#333] group-hover:text-[var(--accent)] transition-colors duration-300 w-5 text-center shrink-0">{sym}</span>
+                        <span className="text-lg text-[#333] group-hover:text-[var(--accent)] transition-colors duration-300 w-5 text-center shrink-0">{"\u25C7"}</span>
                         <div className="flex-1 min-w-0">
                           <span className="text-[11px] text-[#aaa] font-bold uppercase tracking-[0.1em] group-hover:text-white transition-colors block truncate">{r.name}</span>
                           <span className="text-[8px] text-[#333] font-mono">{r.address.slice(0, 10)}…{r.address.slice(-4)}</span>
                         </div>
-                        <span className="text-[7px] uppercase tracking-[0.2em] text-[#333] border border-[#1a1a1a] px-2 py-0.5 shrink-0 group-hover:border-[#333] group-hover:text-[#555] transition-colors">{r.category}</span>
+                        <span className="text-[7px] uppercase tracking-[0.2em] text-[#333] border border-[#1a1a1a] px-2 py-0.5 shrink-0 group-hover:border-[#333] group-hover:text-[#555] transition-colors">{r.checkCount || 10}g</span>
                         <span className="text-[8px] text-[#2a2a2a] group-hover:text-[#555] transition-colors shrink-0 font-mono">{r.totalChecks}p</span>
                       </Link>
                     );

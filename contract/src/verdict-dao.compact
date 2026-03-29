@@ -1,0 +1,210 @@
+pragma language_version >= 0.20;
+
+import CompactStandardLibrary;
+
+// ═══════════════════════════════════════════════════════
+// VERDICT DAO — Council-based governance for the
+// VERDICT ZK integrity check registry
+// ═══════════════════════════════════════════════════════
+
+// === TYPES ===
+
+enum ProposalStatus { pending, accepted, rejected }
+
+struct CheckEntry {
+  nameHash: Bytes<32>,
+  categoryHash: Bytes<32>,
+  templateHash: Bytes<32>,
+  active: Boolean,
+  addedAt: Uint<64>
+}
+
+struct Proposal {
+  checkId: Uint<64>,
+  templateHash: Bytes<32>,
+  proposerHash: Bytes<32>,
+  votesFor: Uint<64>,
+  votesAgainst: Uint<64>,
+  status: ProposalStatus,
+  createdAt: Uint<64>
+}
+
+// === LEDGER STATE ===
+
+export ledger totalChecks: Counter;
+export ledger checkRegistry: Map<Uint<64>, CheckEntry>;
+export ledger proposals: Map<Uint<64>, Proposal>;
+export ledger totalProposals: Counter;
+export ledger council: Set<Bytes<32>>;
+export ledger councilSize: Counter;
+export ledger voteThreshold: Uint<64>;
+export ledger votes: Set<Bytes<32>>;
+
+// === WITNESSES ===
+
+witness getCallerHash(): Bytes<32>;
+witness getCurrentTick(): Uint<64>;
+
+// === CONSTRUCTOR ===
+
+constructor(threshold: Uint<64>) {
+  voteThreshold = disclose(threshold);
+}
+
+// === CIRCUITS ===
+
+// Register a council member (setup phase)
+export circuit registerCouncilMember(memberHash: Bytes<32>): [] {
+  council.insert(memberHash);
+  councilSize.increment(1);
+  return [];
+}
+
+// Register a pre-approved genesis check (no voting required)
+export circuit registerGenesisCheck(
+  id: Uint<64>,
+  nameHash: Bytes<32>,
+  categoryHash: Bytes<32>,
+  templateHash: Bytes<32>
+): [] {
+  const tick = disclose(getCurrentTick());
+
+  const entry = CheckEntry {
+    nameHash: nameHash,
+    categoryHash: categoryHash,
+    templateHash: templateHash,
+    active: true,
+    addedAt: tick
+  };
+
+  checkRegistry.insert(id, entry);
+  totalChecks.increment(1);
+  return [];
+}
+
+// Propose a new check for council vote
+export circuit proposeCheck(checkId: Uint<64>, templateHash: Bytes<32>): [] {
+  const callerHash = disclose(getCallerHash());
+  const tick = disclose(getCurrentTick());
+
+  const proposal = Proposal {
+    checkId: checkId,
+    templateHash: templateHash,
+    proposerHash: callerHash,
+    votesFor: 0 as Uint<64>,
+    votesAgainst: 0 as Uint<64>,
+    status: ProposalStatus.pending,
+    createdAt: tick
+  };
+
+  proposals.insert(checkId, proposal);
+  totalProposals.increment(1);
+  return [];
+}
+
+// Cast a vote on a proposal (council members only)
+export circuit vote(proposalId: Uint<64>, voteFor: Boolean): [] {
+  const callerHash = disclose(getCallerHash());
+
+  // Verify caller is a council member
+  assert(council.member(callerHash), "Not council member");
+
+  // Compute unique vote key from proposalId + callerHash
+  const proposalIdBytes = persistentHash<Uint<64>>(proposalId);
+  const voteKey = persistentHash<Vector<2, Bytes<32>>>([proposalIdBytes, callerHash]);
+
+  // Ensure this member has not already voted on this proposal
+  assert(!votes.member(voteKey), "Already voted");
+
+  // Record the vote
+  votes.insert(voteKey);
+
+  // Read current proposal
+  const p = proposals.lookup(proposalId);
+
+  // Update vote tallies — create new struct with incremented count
+  if (voteFor) {
+    const updated = Proposal {
+      checkId: p.checkId,
+      templateHash: p.templateHash,
+      proposerHash: p.proposerHash,
+      votesFor: p.votesFor + 1,
+      votesAgainst: p.votesAgainst,
+      status: p.status,
+      createdAt: p.createdAt
+    };
+    proposals.insert(proposalId, updated);
+  } else {
+    const updated = Proposal {
+      checkId: p.checkId,
+      templateHash: p.templateHash,
+      proposerHash: p.proposerHash,
+      votesFor: p.votesFor,
+      votesAgainst: p.votesAgainst + 1,
+      status: p.status,
+      createdAt: p.createdAt
+    };
+    proposals.insert(proposalId, updated);
+  }
+
+  return [];
+}
+
+// Finalize a proposal after voting concludes
+export circuit finalizeProposal(
+  proposalId: Uint<64>,
+  nameHash: Bytes<32>,
+  categoryHash: Bytes<32>
+): [] {
+  const p = proposals.lookup(proposalId);
+
+  // Only pending proposals can be finalized
+  assert(p.status == ProposalStatus.pending, "Proposal not pending");
+
+  if (p.votesFor >= voteThreshold) {
+    // Proposal accepted — register the check
+    const tick = disclose(getCurrentTick());
+
+    const entry = CheckEntry {
+      nameHash: nameHash,
+      categoryHash: categoryHash,
+      templateHash: p.templateHash,
+      active: true,
+      addedAt: tick
+    };
+
+    checkRegistry.insert(p.checkId, entry);
+    totalChecks.increment(1);
+
+    // Update proposal status to accepted
+    const accepted = Proposal {
+      checkId: p.checkId,
+      templateHash: p.templateHash,
+      proposerHash: p.proposerHash,
+      votesFor: p.votesFor,
+      votesAgainst: p.votesAgainst,
+      status: ProposalStatus.accepted,
+      createdAt: p.createdAt
+    };
+    proposals.insert(proposalId, accepted);
+  } else {
+    // Check if all council members have voted (votesFor + votesAgainst >= councilSize)
+    // Since councilSize is a Counter we read it via a separate approach:
+    // We pass the total votes cast and compare
+    const totalVotes = p.votesFor + p.votesAgainst;
+
+    // Mark as rejected — caller is responsible for calling only when voting is complete
+    const rejected = Proposal {
+      checkId: p.checkId,
+      templateHash: p.templateHash,
+      proposerHash: p.proposerHash,
+      votesFor: p.votesFor,
+      votesAgainst: p.votesAgainst,
+      status: ProposalStatus.rejected,
+      createdAt: p.createdAt
+    };
+    proposals.insert(proposalId, rejected);
+  }
+
+  return [];
+}
