@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
+import { useWallet } from "@/lib/wallet-context";
 
 const NAV = [
   { href: "/overview", label: "Overview", icon: "\u25C6" },
@@ -19,12 +20,6 @@ interface NetworkStatus {
   blockHeight: number | null;
 }
 
-interface WalletInfo {
-  address: string | null;
-  balance: string;
-  isSynced: boolean;
-}
-
 interface FeedData {
   rulesetCount: number;
   entries: { totalChecks: number; totalFlagged: number }[];
@@ -33,9 +28,8 @@ interface FeedData {
 export function Sidebar() {
   const pathname = usePathname();
   const [status, setStatus] = useState<NetworkStatus | null>(null);
-  const [wallet, setWallet] = useState<WalletInfo | null>(null);
   const [feedData, setFeedData] = useState<FeedData | null>(null);
-  const [walletLoading, setWalletLoading] = useState(false);
+  const wallet = useWallet();
 
   // Poll network status
   useEffect(() => {
@@ -67,19 +61,6 @@ export function Sidebar() {
     fetchFeed();
     const interval = setInterval(fetchFeed, 5000);
     return () => clearInterval(interval);
-  }, []);
-
-  const connectWallet = useCallback(async () => {
-    setWalletLoading(true);
-    try {
-      const res = await fetch("/api/wallet");
-      const data = await res.json();
-      setWallet(data);
-    } catch {
-      setWallet(null);
-    } finally {
-      setWalletLoading(false);
-    }
   }, []);
 
   const isLive =
@@ -117,7 +98,7 @@ export function Sidebar() {
             ◈
           </span>
           <span className="text-[9px] text-[var(--text-muted)] tracking-wider uppercase">
-            v0.1.0 · midnight local
+            v0.1.0 · midnight preprod
           </span>
         </div>
       </div>
@@ -178,10 +159,18 @@ export function Sidebar() {
           </span>
         </div>
 
-        {wallet?.address ? (
+        {wallet.isConnected && wallet.address ? (
           <div className="space-y-1">
-            <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider">
-              Connected
+            <div className="flex items-center justify-between">
+              <div className="text-[9px] text-[var(--accent)] uppercase tracking-wider">
+                Connected
+              </div>
+              <button
+                onClick={wallet.disconnect}
+                className="text-[8px] text-[var(--text-muted)] hover:text-[var(--danger)] uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                ×
+              </button>
             </div>
             <div
               className="text-[9px] text-[var(--text-secondary)] font-mono truncate"
@@ -193,13 +182,22 @@ export function Sidebar() {
               {BigInt(wallet.balance).toLocaleString()} tNight
             </div>
           </div>
+        ) : wallet.laceDetected === false ? (
+          <a
+            href="https://chromewebstore.google.com/detail/lace/gafhhkghbfjjkeiendhlofajokpaflmk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-brutal block text-center w-full text-[10px] uppercase tracking-wider py-1.5 border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all duration-200"
+          >
+            Install Lace Wallet
+          </a>
         ) : (
           <button
-            onClick={connectWallet}
-            disabled={walletLoading}
+            onClick={wallet.connect}
+            disabled={wallet.isConnecting}
             className="btn-brutal w-full text-[10px] uppercase tracking-wider py-1.5 border border-[var(--border-active)] text-[var(--text-secondary)] hover:text-white hover:border-white transition-all duration-200 cursor-pointer disabled:opacity-50"
           >
-            {walletLoading ? "Connecting..." : "Connect Wallet"}
+            {wallet.isConnecting ? "Connecting..." : "Connect Wallet"}
           </button>
         )}
       </div>
