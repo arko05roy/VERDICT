@@ -81,7 +81,7 @@ const PRIVATE_STATE_ID = "verdictPrivateState" as const;
 
 // ─── Init ───────────────────────────────────────────────────────────────────
 
-setNetworkId("undeployed");
+setNetworkId(process.env.MIDNIGHT_NETWORK_ID || "preprod");
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
