@@ -1,25 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deployVerdictContract } from "@/lib/midnight";
-import { validateCompact } from "@/lib/compact-validator";
 
 export async function POST(req: NextRequest) {
-  const { compact, name, description, tags, enabledChecks, vcl } = await req.json();
-
-  if (!compact || typeof compact !== "string" || compact.trim().length === 0) {
-    return NextResponse.json({ error: "Compact code cannot be empty" }, { status: 400 });
-  }
+  const { name, description, tags, enabledChecks, vcl, verifierVersion, enableMask, params } = await req.json();
 
   if (!name || typeof name !== "string") {
     return NextResponse.json({ error: "Ruleset name is required" }, { status: 400 });
   }
 
-  const validation = validateCompact(compact);
-  const criticalErrors = validation.errors.filter((e: any) => e.severity === "error");
-  if (criticalErrors.length > 0) {
-    return NextResponse.json({
-      error: "Compact code has validation errors",
-      validation: criticalErrors,
-    }, { status: 400 });
+  if (!enabledChecks || enabledChecks.length === 0) {
+    return NextResponse.json({ error: "At least one Guardian must be enabled" }, { status: 400 });
   }
 
   try {
@@ -30,7 +20,10 @@ export async function POST(req: NextRequest) {
       enabledChecks: enabledChecks || [],
       checkCount: enabledChecks?.length || 0,
       vcl: vcl || "",
-      compact,
+      compact: "", // No longer generating Compact per ruleset
+      verifierVersion: verifierVersion || "1",
+      enableMask: enableMask || "1023",
+      params: params || {},
     });
 
     return NextResponse.json({
@@ -41,8 +34,10 @@ export async function POST(req: NextRequest) {
       tags: ruleset.tags,
       enabledChecks: ruleset.enabledChecks,
       checkCount: ruleset.checkCount,
+      verifierVersion: ruleset.verifierVersion,
+      enableMask: ruleset.enableMask,
       deployedAt: ruleset.deployedAt,
-      network: process.env.MIDNIGHT_NETWORK || "undeployed",
+      network: process.env.MIDNIGHT_NETWORK || "preprod",
       txHash: ruleset.txHash,
       sdk: `import { Verdict } from "@verdict/sdk";\nconst v = new Verdict("${ruleset.address}");\nconst proof = await v.verify(stateTransition);`,
     });

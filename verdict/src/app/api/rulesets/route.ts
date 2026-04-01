@@ -31,6 +31,8 @@ export async function GET() {
           checkCount: rs.checkCount || 10,
           deployedAt: rs.deployedAt,
           txHash: rs.txHash,
+          verifierVersion: rs.verifierVersion || "1",
+          enableMask: rs.enableMask || "1023",
           totalChecks,
           totalFlagged,
           flaggedRate: `${flaggedRate}%`,

@@ -34,6 +34,25 @@ export type ImpureCircuits<PS> = {
                    enemyPosHashPublic_0: Uint8Array): __compactRuntime.CircuitResults<PS, number>;
 }
 
+export type ProvableCircuits<PS> = {
+  startSession(context: __compactRuntime.CircuitContext<PS>,
+               genesisHash_0: Uint8Array): __compactRuntime.CircuitResults<PS, []>;
+  commitMove(context: __compactRuntime.CircuitContext<PS>, c_0: Uint8Array): __compactRuntime.CircuitResults<PS, []>;
+  verifyTransition(context: __compactRuntime.CircuitContext<PS>,
+                   maxVelocity_0: bigint,
+                   maxAcceleration_0: bigint,
+                   boundX_0: bigint,
+                   boundY_0: bigint,
+                   validActionCount_0: bigint,
+                   maxActionsPerWindow_0: bigint,
+                   windowSize_0: bigint,
+                   minDiversity_0: bigint,
+                   snapThreshold_0: bigint,
+                   maxSnaps_0: bigint,
+                   maxCorrelation_0: bigint,
+                   enemyPosHashPublic_0: Uint8Array): __compactRuntime.CircuitResults<PS, number>;
+}
+
 export type PureCircuits = {
 }
 
@@ -73,6 +92,7 @@ export declare class Contract<PS = any, W extends Witnesses<PS> = Witnesses<PS>>
   witnesses: W;
   circuits: Circuits<PS>;
   impureCircuits: ImpureCircuits<PS>;
+  provableCircuits: ProvableCircuits<PS>;
   constructor(witnesses: W);
   initialState(context: __compactRuntime.ConstructorContext<PS>): __compactRuntime.ConstructorResult<PS>;
 }

@@ -24,7 +24,7 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "@midnight-ntwrk/compact-runtime": "0.14.0",
+    "@midnight-ntwrk/compact-runtime": "0.15.0",
     "@midnight-ntwrk/ledger": "^4.0.0",
     "@midnight-ntwrk/ledger-v7": "7.0.2",
     "@midnight-ntwrk/midnight-js-contracts": "3.0.0",
@@ -47,6 +47,7 @@
   },
   "overrides": {
     "smoldot": "npm:@aspect-build/empty@0.0.0",
+    "@midnight-ntwrk/compact-runtime": "0.15.0",
     "@midnight-ntwrk/ledger-v7": "7.0.2",
     "@midnight-ntwrk/midnight-js-network-id": "3.1.0"
   }

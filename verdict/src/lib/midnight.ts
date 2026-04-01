@@ -96,6 +96,11 @@ export interface DeployedRuleset {
   deployedAt: string;
   txHash: string;
   compact: string;
+  // v3 fields — versioned verifier architecture
+  verifierVersion?: string;
+  enableMask?: string; // bigint serialized as string
+  params?: Record<string, string>;
+  rulesetId?: string;
   // Legacy field — kept for backward compat with v1 store entries
   category?: string;
 }
@@ -126,19 +131,27 @@ interface RulesetEntry {
 
 const STORE_PATH = path.resolve(process.cwd(), ".verdict-store.json");
 
-function migrateV1Entry(rs: any): DeployedRuleset {
+function migrateEntry(rs: any): DeployedRuleset {
   // v1 entries have `category` but no `enabledChecks`
-  if (rs.enabledChecks) return rs;
-  return {
-    ...rs,
-    tags: rs.category ? [rs.category] : [],
-    enabledChecks: [
-      "mnemosyne", "styx", "hermes", "phaethon", "terminus",
-      "themis", "chronos", "moirai", "daedalus", "prometheus",
-    ],
-    checkCount: 10,
-    vcl: "",
-  };
+  if (!rs.enabledChecks) {
+    rs = {
+      ...rs,
+      tags: rs.category ? [rs.category] : [],
+      enabledChecks: [
+        "mnemosyne", "styx", "hermes", "phaethon", "terminus",
+        "themis", "chronos", "moirai", "daedalus", "prometheus",
+      ],
+      checkCount: 10,
+      vcl: "",
+    };
+  }
+  // v2 entries have no verifierVersion — assign to genesis v1
+  if (!rs.verifierVersion) {
+    rs.verifierVersion = "1";
+    rs.enableMask = "1023"; // all 10 guardians = 0x3FF
+    rs.params = rs.params || {};
+  }
+  return rs;
 }
 
 function loadStore(): RulesetEntry[] {
@@ -147,7 +160,7 @@ function loadStore(): RulesetEntry[] {
       const raw = fs.readFileSync(STORE_PATH, "utf-8");
       const entries: RulesetEntry[] = JSON.parse(raw);
       return entries.map((e) => ({
-        ruleset: migrateV1Entry(e.ruleset),
+        ruleset: migrateEntry(e.ruleset),
       }));
     }
   } catch (err) {
@@ -466,6 +479,9 @@ export async function deployVerdictContract(meta: {
   checkCount: number;
   vcl: string;
   compact: string;
+  verifierVersion?: string;
+  enableMask?: string;
+  params?: Record<string, string>;
 }): Promise<DeployedRuleset> {
   const { providers } = await ensureInitialized();
 
@@ -492,6 +508,9 @@ export async function deployVerdictContract(meta: {
     deployedAt: new Date().toISOString(),
     txHash: typeof txHash === "string" ? txHash : contractAddress,
     compact: meta.compact,
+    verifierVersion: meta.verifierVersion || "1",
+    enableMask: meta.enableMask || "1023",
+    params: meta.params || {},
   };
 
   rulesetRegistry.set(contractAddress, { ruleset });

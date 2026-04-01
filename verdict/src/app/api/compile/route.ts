@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseVCL, validateVCL, compileVCL } from "@/lib/vcl";
+import { parseVCL, validateVCL, compileVCL, compileVCLToConfig } from "@/lib/vcl";
 import { validateCompact } from "@/lib/compact-validator";
 
 export async function POST(req: NextRequest) {
-  const { vcl } = await req.json();
+  const { vcl, mode } = await req.json();
 
   if (!vcl || typeof vcl !== "string" || vcl.trim().length === 0) {
     return NextResponse.json({ error: "VCL input cannot be empty" }, { status: 400 });
@@ -28,20 +28,36 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Step 3: Deterministic compilation — no AI
-    const result = compileVCL(parsed.document);
+    // Legacy mode: generate Compact code (deprecated)
+    if (mode === "compact") {
+      const result = compileVCL(parsed.document);
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      const compactValidation = validateCompact(result.compact);
+      return NextResponse.json({
+        compact: result.compact,
+        enabledChecks: result.enabledChecks,
+        checkCount: result.checkCount,
+        validation: compactValidation.errors,
+        vcl,
+      });
+    }
+
+    // Default: config mode — no Compact generation
+    const result = compileVCLToConfig(parsed.document);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    // Step 4: Validate generated Compact (should always pass)
-    const compactValidation = validateCompact(result.compact);
-
     return NextResponse.json({
-      compact: result.compact,
-      enabledChecks: result.enabledChecks,
-      checkCount: result.checkCount,
-      validation: compactValidation.errors,
+      config: {
+        verifierVersion: result.config.verifierVersion,
+        enableMask: result.config.enableMask.toString(),
+        enabledChecks: result.config.enabledChecks,
+        checkCount: result.config.checkCount,
+        params: result.config.params,
+      },
       vcl,
     });
   } catch (e: any) {

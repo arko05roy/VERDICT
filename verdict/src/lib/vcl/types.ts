@@ -17,3 +17,16 @@ export interface VCLError {
 export type VCLParseResult =
   | { ok: true; document: VCLDocument }
   | { ok: false; errors: VCLError[] };
+
+// New config-based output (no Compact code generation)
+export interface VCLCompiledConfig {
+  verifierVersion: string;
+  enableMask: bigint;
+  enabledChecks: string[];
+  checkCount: number;
+  params: Record<string, string>;
+}
+
+export type VCLConfigResult =
+  | { ok: true; config: VCLCompiledConfig }
+  | { ok: false; error: string };
