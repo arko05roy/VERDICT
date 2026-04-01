@@ -4,9 +4,9 @@
 
 Every rule-based system — a game, a financial exchange, an insurance processor, a lending platform — follows the same pattern: take an input state, apply rules, produce an output state. The question VERDICT answers is: **was this state transition valid?**
 
-Instead of building bespoke verification for every domain, VERDICT consolidates the entire problem space into **10 mathematical checks** that run inside a single ZK circuit. These 10 checks aren't arbitrary — they map to the fundamental categories of rule violation that exist across any system processing state transitions.
+Instead of building bespoke verification for every domain, VERDICT consolidates the entire problem space into **10 mathematical checks** that run inside a single ZK circuit. These 10 checks map to the fundamental categories of rule violation that exist across any system processing state transitions.
 
-The circuit is written in [Compact](https://docs.midnight.network), Midnight's native ZK language. All 10 checks execute in a single `verifyTransition` call. The private data (positions, actions, history) enters as **witnesses** — the circuit verifies them and they're never revealed. Only the verdict is public: `CLEAN` or `FLAGGED`.
+The genesis verifier circuit (`verdict.compact`) is written in [Compact](https://docs.midnight.network), Midnight's native ZK language. All 10 checks execute in a single `verifyTransition` call. Rulesets enable a subset of these checks via a bitmask and configure their parameters — no per-ruleset compilation needed. The private data enters as **witnesses** — verified inside the circuit, never revealed. Only the verdict is public: `CLEAN` or `FLAGGED`.
 
 ---
 
