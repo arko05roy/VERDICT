@@ -172,7 +172,7 @@ export default function DeployPage() {
       if (!check) continue;
       const params = checkParams[id] || {};
       const paramLines = Object.entries(params)
-        .filter(([, v]) => v.trim() !== "")
+        .filter(([, v]) => String(v).trim() !== "")
         .map(([k, v]) => `  ${k}: ${v}`)
         .join("\n");
       if (paramLines) {
@@ -578,8 +578,16 @@ export default function DeployPage() {
                 {/* VCL source */}
                 <details className="mb-4">
                   <summary className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] cursor-pointer hover:text-[var(--text-secondary)]">VCL SOURCE</summary>
-                  <pre className="mt-2 p-3 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-sm text-xs text-[var(--text-secondary)] overflow-x-auto max-h-40">{vcl}</pre>
+                  <pre className="mt-2 p-3 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-sm text-xs text-[var(--text-secondary)] overflow-x-auto max-h-64 overflow-y-auto">{vcl}</pre>
                 </details>
+
+                {/* Compiled Compact contract */}
+                {compact && (
+                  <details className="mb-4">
+                    <summary className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] cursor-pointer hover:text-[var(--text-secondary)]">COMPILED COMPACT CONTRACT</summary>
+                    <pre className="mt-2 p-3 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-sm text-xs text-[var(--text-secondary)] overflow-x-auto max-h-80 overflow-y-auto">{compact}</pre>
+                  </details>
+                )}
 
                 <div className="flex justify-between items-center mt-8 pt-4 border-t border-[var(--border)]">
                   <button onClick={() => transitionTo(3)} className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]">{"\u2190"} Back</button>
@@ -630,6 +638,12 @@ export default function DeployPage() {
                     <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-1">SDK</p>
                     <pre className="text-xs text-[var(--accent)] whitespace-pre-wrap">{deployResult.sdk}</pre>
                   </div>
+                  {(deployResult.compact || compact) && (
+                    <details>
+                      <summary className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] cursor-pointer hover:text-[var(--text-secondary)]">COMPACT CONTRACT</summary>
+                      <pre className="mt-2 p-3 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-sm text-xs text-[var(--text-secondary)] overflow-x-auto max-h-80 overflow-y-auto">{deployResult.compact || compact}</pre>
+                    </details>
+                  )}
                 </div>
 
                 <button onClick={resetAll} className="px-6 py-2 text-xs tracking-[0.2em] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">

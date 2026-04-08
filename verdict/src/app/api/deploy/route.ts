@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deployVerdictContract } from "@/lib/midnight";
+import { parseVCL, compileVCL } from "@/lib/vcl";
 
 export async function POST(req: NextRequest) {
   const { name, description, tags, enabledChecks, vcl, verifierVersion, enableMask, params } = await req.json();
@@ -12,6 +13,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "At least one Guardian must be enabled" }, { status: 400 });
   }
 
+  // Compile VCL to Compact so we can return it for verification
+  let compiledCompact = "";
+  if (vcl) {
+    const parsed = parseVCL(vcl);
+    if (parsed.ok) {
+      const compiled = compileVCL(parsed.document);
+      if (compiled.ok) {
+        compiledCompact = compiled.compact;
+      }
+    }
+  }
+
   try {
     const ruleset = await deployVerdictContract({
       name,
@@ -20,7 +33,7 @@ export async function POST(req: NextRequest) {
       enabledChecks: enabledChecks || [],
       checkCount: enabledChecks?.length || 0,
       vcl: vcl || "",
-      compact: "", // No longer generating Compact per ruleset
+      compact: compiledCompact,
       verifierVersion: verifierVersion || "1",
       enableMask: enableMask || "1023",
       params: params || {},
@@ -39,6 +52,7 @@ export async function POST(req: NextRequest) {
       deployedAt: ruleset.deployedAt,
       network: process.env.MIDNIGHT_NETWORK || "preprod",
       txHash: ruleset.txHash,
+      compact: compiledCompact,
       sdk: `import { Verdict } from "@verdict/sdk";\nconst v = new Verdict("${ruleset.address}");\nconst proof = await v.verify(stateTransition);`,
     });
   } catch (err: any) {
