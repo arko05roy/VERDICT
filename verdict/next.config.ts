@@ -1,6 +1,19 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    turbo: {
+      resolveAlias: {
+        "@midnight-ntwrk/verdict-contract": path.resolve(
+          __dirname,
+          "..",
+          "contract",
+          "dist"
+        ),
+      },
+    },
+  },
   typescript: {
     // Pre-existing type error in midnight.ts:354 (wallet SDK config mismatch)
     ignoreBuildErrors: true,
