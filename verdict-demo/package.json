@@ -1,0 +1,45 @@
+{
+  "name": "verdict-demo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/compact-js": "*",
+    "@midnight-ntwrk/compact-runtime": "*",
+    "@midnight-ntwrk/ledger-v7": "*",
+    "@midnight-ntwrk/midnight-js-contracts": "*",
+    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "*",
+    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "*",
+    "@midnight-ntwrk/midnight-js-level-private-state-provider": "*",
+    "@midnight-ntwrk/midnight-js-network-id": "*",
+    "@midnight-ntwrk/midnight-js-node-zk-config-provider": "*",
+    "@midnight-ntwrk/midnight-js-types": "*",
+    "@midnight-ntwrk/midnight-js-utils": "*",
+    "@midnight-ntwrk/verdict-contract": "*",
+    "@midnight-ntwrk/wallet-sdk-dust-wallet": "*",
+    "@midnight-ntwrk/wallet-sdk-facade": "*",
+    "@midnight-ntwrk/wallet-sdk-hd": "*",
+    "@midnight-ntwrk/wallet-sdk-shielded": "*",
+    "@midnight-ntwrk/wallet-sdk-unshielded-wallet": "*",
+    "chess.js": "^1.4.0",
+    "next": "16.1.7",
+    "pino": "^10.3.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "recharts": "^3.8.0",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/ws": "^8",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
