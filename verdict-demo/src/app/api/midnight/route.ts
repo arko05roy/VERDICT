@@ -124,6 +124,19 @@ export async function POST(req: NextRequest) {
         const params = body.params as any;
         if (!state || !params) return err("Missing state or params");
 
+        // Auto-connect and deploy if not already set up
+        const preStatus = midnight.getStatus();
+        if (!preStatus.connected) {
+          console.log("[api/midnight] Auto-connecting wallet (standalone)...");
+          await midnight.connect("standalone");
+        }
+        if (!preStatus.hasContract) {
+          console.log("[api/midnight] Auto-deploying contract...");
+          await midnight.deploy();
+          console.log("[api/midnight] Auto-starting session...");
+          await midnight.startSession();
+        }
+
         // 1. Update private state
         const privateState = {
           prevPrevPos: [BigInt(state.prevPrevPos[0]), BigInt(state.prevPrevPos[1])] as [bigint, bigint],
@@ -170,8 +183,18 @@ export async function POST(req: NextRequest) {
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    console.error(`[api/midnight] Action "${action}" failed:`, e);
-    return json({ ok: false, error: message }, 500);
+    const stack = e instanceof Error ? e.stack : undefined;
+    const cause = e instanceof Error && (e as any).cause ? String((e as any).cause) : undefined;
+    console.error(`[api/midnight] Action "${action}" failed:`, message);
+    console.error(`[api/midnight] Stack:`, stack);
+    console.error(`[api/midnight] Cause:`, cause);
+    // Also log any nested cause chain
+    let innerCause = (e as any)?.cause;
+    while (innerCause) {
+      console.error(`[api/midnight] Inner cause:`, innerCause instanceof Error ? innerCause.message : String(innerCause));
+      innerCause = innerCause?.cause;
+    }
+    return json({ ok: false, error: `${message}`, cause, stack: stack?.slice(0, 500) }, 500);
   }
 }
 

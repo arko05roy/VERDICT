@@ -16,7 +16,7 @@ services:
 
   verdict-indexer:
     container_name: 'verdict-indexer'
-    image: 'midnightntwrk/indexer-standalone:3.0.0'
+    image: 'midnightntwrk/indexer-standalone:3.1.0'
     environment:
       APP__INFRA__NODE__URL: 'ws://verdict-node:9944'
       APP__INFRA__STORAGE__PASSWORD: 'indexer'
@@ -38,7 +38,7 @@ services:
         condition: service_healthy
 
   verdict-node:
-    image: 'midnightntwrk/midnight-node:0.20.0'
+    image: 'midnightntwrk/midnight-node:0.21.0'
     container_name: 'verdict-node'
     ports:
       - '9944:9944'

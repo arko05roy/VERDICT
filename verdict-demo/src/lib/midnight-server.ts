@@ -1,9 +1,6 @@
 /**
- * Server-side Midnight SDK integration.
- * Runs in Next.js API routes (Node.js), not in the browser.
- *
- * This module wraps the real Midnight SDK calls from counter-cli/src/api.ts
- * for use in the verdict-demo frontend via API routes.
+ * Server-side Midnight SDK integration (SDK 2.0.0 / Node 0.21.0)
+ * Matches the official midnight-local-dev wallet pattern.
  */
 
 import { Verdict, type VerdictPrivateState, witnesses } from "@midnight-ntwrk/verdict-contract";
@@ -20,9 +17,9 @@ import type { ImpureCircuitId } from "@midnight-ntwrk/compact-js";
 import type { MidnightProviders } from "@midnight-ntwrk/midnight-js-types";
 import { setNetworkId, getNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
 import { assertIsContractAddress, toHex } from "@midnight-ntwrk/midnight-js-utils";
-import { WalletFacade } from "@midnight-ntwrk/wallet-sdk-facade";
+import { type DefaultConfiguration, WalletFacade } from "@midnight-ntwrk/wallet-sdk-facade";
 import { DustWallet } from "@midnight-ntwrk/wallet-sdk-dust-wallet";
-import { HDWallet, Roles, generateRandomSeed } from "@midnight-ntwrk/wallet-sdk-hd";
+import { HDWallet, Roles } from "@midnight-ntwrk/wallet-sdk-hd";
 import { ShieldedWallet } from "@midnight-ntwrk/wallet-sdk-shielded";
 import {
   createKeystore,
@@ -32,13 +29,11 @@ import {
   type UnshieldedKeystore,
 } from "@midnight-ntwrk/wallet-sdk-unshielded-wallet";
 import * as ledger from "@midnight-ntwrk/ledger-v7";
-import { unshieldedToken } from "@midnight-ntwrk/ledger-v7";
 import { WebSocket } from "ws";
 import * as Rx from "rxjs";
 import { Buffer } from "buffer";
 import path from "node:path";
 
-// ─── Polyfill WebSocket for Node ───
 // @ts-expect-error: Needed for GraphQL subscriptions in Node.js
 globalThis.WebSocket = WebSocket;
 
@@ -54,6 +49,7 @@ interface Config {
   indexerWS: string;
   node: string;
   proofServer: string;
+  networkId: string;
 }
 
 interface WalletContext {
@@ -65,7 +61,7 @@ interface WalletContext {
 
 // ─── Config ───
 
-const zkConfigPath = path.resolve(process.cwd(), "..", "contract", "src", "managed", "verdict");
+const zkConfigPath = path.resolve("/Users/arkoroy/Desktop/ratri/contract/src/managed/verdict");
 
 const CONFIGS: Record<string, Config> = {
   standalone: {
@@ -73,18 +69,7 @@ const CONFIGS: Record<string, Config> = {
     indexerWS: "ws://127.0.0.1:8088/api/v3/graphql/ws",
     node: "http://127.0.0.1:9944",
     proofServer: "http://127.0.0.1:6300",
-  },
-  preprod: {
-    indexer: "https://indexer.preprod.midnight.network/api/v3/graphql",
-    indexerWS: "wss://indexer.preprod.midnight.network/api/v3/graphql/ws",
-    node: "https://rpc.preprod.midnight.network",
-    proofServer: "http://127.0.0.1:6300",
-  },
-  preview: {
-    indexer: "https://indexer.preview.midnight.network/api/v3/graphql",
-    indexerWS: "wss://indexer.preview.midnight.network/api/v3/graphql/ws",
-    node: "https://rpc.preview.midnight.network",
-    proofServer: "http://127.0.0.1:6300",
+    networkId: "undeployed",
   },
 };
 
@@ -95,10 +80,21 @@ let compiledContract: any = null;
 function getCompiledContract() {
   if (!compiledContract) {
     console.log("[midnight-server] Compiling contract from:", zkConfigPath);
-    compiledContract = (CompiledContract as any).make("verdict", Verdict.Contract).pipe(
-      (CompiledContract as any).withVacantWitnesses,
-      (CompiledContract as any).withCompiledFileAssets(zkConfigPath),
-    );
+    console.log("[midnight-server] Witnesses keys:", Object.keys(witnesses));
+
+    // @ts-expect-error — Compact SDK generics
+    const base = CompiledContract.make("verdict", Verdict.Contract);
+
+    // Inject real witnesses (withVacantWitnesses sets witnesses:{} which Contract constructor rejects)
+    const symbols = Object.getOwnPropertySymbols(base);
+    const contextSymbol = symbols.find(s => s !== Symbol.for("compact-js/CompiledContract"));
+    if (contextSymbol) {
+      (base as any)[contextSymbol].witnesses = witnesses;
+      console.log("[midnight-server] Injected real witnesses");
+    }
+
+    compiledContract = CompiledContract.withCompiledFileAssets(base as any, zkConfigPath);
+    console.log("[midnight-server] Compiled contract created");
   }
   return compiledContract;
 }
@@ -120,26 +116,63 @@ const defaultPrivateState: VerdictPrivateState = {
   enemyPositions: new Array(16).fill(BigInt(0)),
 };
 
-// ─── Singleton state (persists across API calls within same server process) ───
+// ─── Singleton state ───
 
 let walletCtx: WalletContext | null = null;
 let providers: VerdictProviders | null = null;
 let contract: DeployedVerdictContract | null = null;
-let currentNetwork: string = "preprod";
-let currentSeed: string | null = null;
+let currentNetwork = "standalone";
 
-// ─── Wallet ───
+// Genesis pre-funded wallet seed for standalone
+const GENESIS_SEED = "0000000000000000000000000000000000000000000000000000000000000001";
 
-function deriveKeysFromSeed(seed: string) {
-  const hdWallet = HDWallet.fromSeed(Buffer.from(seed, "hex"));
-  if (hdWallet.type !== "seedOk") throw new Error("Failed to initialize HDWallet from seed");
+// ─── Wallet (SDK 2.0.0 pattern from midnight-local-dev) ───
+
+async function buildWallet(config: Config, hexSeed: string): Promise<WalletContext> {
+  console.log("[midnight-server] Building wallet from seed...");
+
+  const seed = Buffer.from(hexSeed, "hex");
+  const hdWallet = HDWallet.fromSeed(seed);
+  if (hdWallet.type !== "seedOk") throw new Error("Failed to initialize HDWallet");
+
   const derivationResult = hdWallet.hdWallet
     .selectAccount(0)
     .selectRoles([Roles.Zswap, Roles.NightExternal, Roles.Dust])
     .deriveKeysAt(0);
+
   if (derivationResult.type !== "keysDerived") throw new Error("Failed to derive keys");
   hdWallet.hdWallet.clear();
-  return derivationResult.keys;
+
+  const shieldedSecretKeys = ledger.ZswapSecretKeys.fromSeed(derivationResult.keys[Roles.Zswap]);
+  const dustSecretKey = ledger.DustSecretKey.fromSeed(derivationResult.keys[Roles.Dust]);
+  const unshieldedKeystore = createKeystore(derivationResult.keys[Roles.NightExternal], config.networkId);
+
+  // SDK 2.0.0 pattern: WalletFacade.init with factory functions
+  const configuration: DefaultConfiguration = {
+    networkId: config.networkId,
+    indexerClientConnection: {
+      indexerHttpUrl: config.indexer,
+      indexerWsUrl: config.indexerWS,
+    },
+    provingServerUrl: new URL(config.proofServer),
+    relayURL: new URL(config.node.replace(/^http/, "ws")),
+    costParameters: {
+      additionalFeeOverhead: BigInt("300000000000000"),
+      feeBlocksMargin: 5,
+    },
+    txHistoryStorage: new InMemoryTransactionHistoryStorage(),
+  };
+
+  const wallet = await WalletFacade.init({
+    configuration,
+    shielded: (cfg) => ShieldedWallet(cfg).startWithSecretKeys(shieldedSecretKeys),
+    unshielded: (cfg) => UnshieldedWallet(cfg).startWithPublicKey(PublicKey.fromKeyStore(unshieldedKeystore)),
+    dust: (cfg) => DustWallet(cfg).startWithSecretKey(dustSecretKey, ledger.LedgerParameters.initialParameters().dust),
+  });
+  await wallet.start(shieldedSecretKeys, dustSecretKey);
+
+  console.log("[midnight-server] Wallet initialized");
+  return { wallet, shieldedSecretKeys, dustSecretKey, unshieldedKeystore };
 }
 
 async function createWalletAndMidnightProvider(ctx: WalletContext): Promise<WalletProvider & MidnightProvider> {
@@ -194,7 +227,7 @@ function signTransactionIntents(
   }
 }
 
-// ─── Public API functions (called from API routes) ───
+// ─── Public API ───
 
 export async function connect(network: string, seed?: string): Promise<{
   walletAddress: string;
@@ -203,62 +236,22 @@ export async function connect(network: string, seed?: string): Promise<{
 }> {
   console.log(`[midnight-server] connect(${network})`);
 
-  const config = CONFIGS[network];
-  if (!config) throw new Error(`Unknown network: ${network}`);
-
-  const networkIdMap: Record<string, string> = { standalone: "undeployed", preprod: "preprod", preview: "preview" };
-  setNetworkId(networkIdMap[network] || "preprod");
+  const config = CONFIGS[network] || CONFIGS.standalone;
+  setNetworkId(config.networkId);
   currentNetwork = network;
 
-  // Standalone uses the pre-funded genesis mint wallet — no faucet needed
-  const GENESIS_SEED = "0000000000000000000000000000000000000000000000000000000000000001";
-  const walletSeed = seed || (network === "standalone" ? GENESIS_SEED : toHex(Buffer.from(generateRandomSeed())));
-  currentSeed = walletSeed;
-
-  console.log("[midnight-server] Deriving keys from seed...");
-  const keys = deriveKeysFromSeed(walletSeed);
-  const shieldedSecretKeys = ledger.ZswapSecretKeys.fromSeed(keys[Roles.Zswap]);
-  const dustSecretKey = ledger.DustSecretKey.fromSeed(keys[Roles.Dust]);
-  const unshieldedKeystore = createKeystore(keys[Roles.NightExternal], getNetworkId());
-
-  const buildShieldedConfig = () => ({
-    networkId: getNetworkId(),
-    indexerClientConnection: { indexerHttpUrl: config.indexer, indexerWsUrl: config.indexerWS },
-    provingServerUrl: new URL(config.proofServer),
-    relayURL: new URL(config.node.replace(/^http/, "ws")),
-  });
-
-  const buildUnshieldedConfig = () => ({
-    networkId: getNetworkId(),
-    indexerClientConnection: { indexerHttpUrl: config.indexer, indexerWsUrl: config.indexerWS },
-    txHistoryStorage: new InMemoryTransactionHistoryStorage(),
-  });
-
-  const buildDustConfig = () => ({
-    networkId: getNetworkId(),
-    costParameters: { additionalFeeOverhead: BigInt("300000000000000"), feeBlocksMargin: 5 },
-    indexerClientConnection: { indexerHttpUrl: config.indexer, indexerWsUrl: config.indexerWS },
-    provingServerUrl: new URL(config.proofServer),
-    relayURL: new URL(config.node.replace(/^http/, "ws")),
-  });
-
-  console.log("[midnight-server] Building wallet...");
-  const shieldedWallet = ShieldedWallet(buildShieldedConfig()).startWithSecretKeys(shieldedSecretKeys);
-  const unshieldedWallet = UnshieldedWallet(buildUnshieldedConfig()).startWithPublicKey(
-    PublicKey.fromKeyStore(unshieldedKeystore),
-  );
-  const dustWallet = DustWallet(buildDustConfig()).startWithSecretKey(
-    dustSecretKey,
-    ledger.LedgerParameters.initialParameters().dust,
-  );
-  const wallet = new WalletFacade(shieldedWallet, unshieldedWallet, dustWallet);
-  await wallet.start(shieldedSecretKeys, dustSecretKey);
-
-  walletCtx = { wallet, shieldedSecretKeys, dustSecretKey, unshieldedKeystore };
+  const walletSeed = seed || GENESIS_SEED;
+  walletCtx = await buildWallet(config, walletSeed);
 
   console.log("[midnight-server] Syncing wallet...");
-  await Rx.firstValueFrom(wallet.state().pipe(Rx.throttleTime(5_000), Rx.filter((state) => state.isSynced)));
+  await Rx.firstValueFrom(
+    walletCtx.wallet.state().pipe(
+      Rx.throttleTime(5_000),
+      Rx.filter((state) => state.isSynced),
+    ),
+  );
 
+  // Configure providers
   const walletAndMidnightProvider = await createWalletAndMidnightProvider(walletCtx);
   const zkConfigProvider = new NodeZkConfigProvider<VerdictCircuits>(zkConfigPath);
 
@@ -274,22 +267,49 @@ export async function connect(network: string, seed?: string): Promise<{
     midnightProvider: walletAndMidnightProvider,
   };
 
-  const syncedState = await Rx.firstValueFrom(wallet.state().pipe(Rx.filter((s) => s.isSynced)));
-  const balance = syncedState.unshielded.balances[unshieldedToken().raw] ?? BigInt(0);
+  const syncedState = await Rx.firstValueFrom(walletCtx.wallet.state().pipe(Rx.filter((s) => s.isSynced)));
+  const balance = syncedState.unshielded?.balances[ledger.nativeToken().raw] ?? BigInt(0);
 
-  const address = String(unshieldedKeystore.getBech32Address());
+  const address = String(walletCtx.unshieldedKeystore.getBech32Address());
   console.log("[midnight-server] Wallet connected:", address, "Balance:", balance.toString());
 
-  return {
-    walletAddress: address,
-    network,
-    balance: balance.toString(),
-  };
+  // Register for dust generation if needed
+  try {
+    const dustBalance = syncedState.dust?.balance(new Date()) ?? BigInt(0);
+    if (dustBalance === BigInt(0)) {
+      console.log("[midnight-server] Registering Night UTXOs for dust generation...");
+      const unregisteredNightUtxos = syncedState.unshielded?.availableCoins.filter(
+        (coin: any) => coin.meta?.registeredForDustGeneration !== true
+      ) ?? [];
+      if (unregisteredNightUtxos.length > 0) {
+        const recipe = await walletCtx.wallet.registerNightUtxosForDustGeneration(
+          unregisteredNightUtxos,
+          walletCtx.unshieldedKeystore.getPublicKey(),
+          (payload) => walletCtx!.unshieldedKeystore.signData(payload),
+        );
+        const finalized = await walletCtx.wallet.finalizeRecipe(recipe);
+        await walletCtx.wallet.submitTransaction(finalized);
+        console.log("[midnight-server] Dust registration submitted, waiting for dust...");
+        await Rx.firstValueFrom(
+          walletCtx.wallet.state().pipe(
+            Rx.throttleTime(5_000),
+            Rx.filter((s) => (s.dust?.balance(new Date()) ?? BigInt(0)) > BigInt(0)),
+          ),
+        );
+        console.log("[midnight-server] Dust available!");
+      }
+    } else {
+      console.log("[midnight-server] Dust already available:", dustBalance.toString());
+    }
+  } catch (e) {
+    console.error("[midnight-server] Dust registration failed:", e);
+  }
+
+  return { walletAddress: address, network, balance: balance.toString() };
 }
 
 export async function deploy(): Promise<{ contractAddress: string }> {
   console.log("[midnight-server] deploy()");
-
   if (!providers) throw new Error("Not connected — call connect first");
 
   const compiled = getCompiledContract();
@@ -308,8 +328,7 @@ export async function deploy(): Promise<{ contractAddress: string }> {
 
 export async function join(contractAddress: string): Promise<{ contractAddress: string }> {
   console.log(`[midnight-server] join(${contractAddress})`);
-
-  if (!providers) throw new Error("Not connected — call connect first");
+  if (!providers) throw new Error("Not connected");
 
   const compiled = getCompiledContract();
   contract = await findDeployedContract(providers, {
@@ -325,25 +344,20 @@ export async function join(contractAddress: string): Promise<{ contractAddress: 
 
 export async function startSession(): Promise<{ txHash: string }> {
   console.log("[midnight-server] startSession()");
+  if (!contract) throw new Error("No contract");
 
-  if (!contract) throw new Error("No contract — deploy or join first");
-
-  const genesisHash = new Uint8Array(32);
-  const result = await contract.callTx.startSession(genesisHash);
+  const result = await contract.callTx.startSession(new Uint8Array(32));
   const txHash = toHex(Buffer.from((result as any).txHash ?? new Uint8Array(32)));
-
   console.log("[midnight-server] Session started, tx:", txHash);
   return { txHash };
 }
 
 export async function commitMove(commitment: Uint8Array): Promise<{ txHash: string }> {
   console.log("[midnight-server] commitMove()");
-
-  if (!contract) throw new Error("No contract — deploy or join first");
+  if (!contract) throw new Error("No contract");
 
   const result = await contract.callTx.commitMove(commitment);
   const txHash = toHex(Buffer.from((result as any).txHash ?? new Uint8Array(32)));
-
   console.log("[midnight-server] Move committed, tx:", txHash);
   return { txHash };
 }
@@ -363,8 +377,7 @@ export async function verifyTransition(params: {
   enemyPosHash: number[];
 }): Promise<{ verdict: number; txHash: string }> {
   console.log("[midnight-server] verifyTransition()");
-
-  if (!contract) throw new Error("No contract — deploy or join first");
+  if (!contract) throw new Error("No contract");
 
   const result = await contract.callTx.verifyTransition(
     BigInt(params.maxVelocity),
@@ -383,8 +396,7 @@ export async function verifyTransition(params: {
 
   const verdict = (result as any).data ?? 0;
   const txHash = toHex(Buffer.from((result as any).txHash ?? new Uint8Array(32)));
-
-  console.log("[midnight-server] Verification complete, verdict:", verdict, "tx:", txHash);
+  console.log("[midnight-server] Verdict:", verdict, "tx:", txHash);
   return { verdict, txHash };
 }
 
@@ -395,20 +407,16 @@ export async function readLedgerState(contractAddress: string): Promise<{
   sessionActive: boolean;
 } | null> {
   console.log(`[midnight-server] readLedgerState(${contractAddress})`);
-
   if (!providers) throw new Error("Not connected");
 
   assertIsContractAddress(contractAddress as ContractAddress);
   const state = await providers.publicDataProvider
     .queryContractState(contractAddress as ContractAddress)
-    .then((contractState) => (contractState != null ? Verdict.ledger(contractState.data) : null));
+    .then((cs) => (cs != null ? Verdict.ledger(cs.data) : null));
 
-  if (!state) {
-    console.log("[midnight-server] No ledger state found");
-    return null;
-  }
+  if (!state) return null;
 
-  console.log("[midnight-server] Ledger state:", {
+  console.log("[midnight-server] Ledger:", {
     totalChecks: state.totalChecks.toString(),
     totalFlagged: state.totalFlagged.toString(),
     lastVerdict: state.lastVerdict,
@@ -423,13 +431,7 @@ export async function readLedgerState(contractAddress: string): Promise<{
   };
 }
 
-export function getStatus(): {
-  connected: boolean;
-  network: string;
-  hasContract: boolean;
-  contractAddress: string | null;
-  walletAddress: string | null;
-} {
+export function getStatus() {
   return {
     connected: walletCtx !== null && providers !== null,
     network: currentNetwork,
@@ -442,22 +444,15 @@ export function getStatus(): {
 export async function disconnect(): Promise<void> {
   console.log("[midnight-server] disconnect()");
   if (walletCtx) {
-    try { await walletCtx.wallet.stop(); } catch (e) { console.error("[midnight-server] Error stopping wallet:", e); }
+    try { await walletCtx.wallet.stop(); } catch (e) { console.error("[midnight-server] Stop error:", e); }
   }
   walletCtx = null;
   providers = null;
   contract = null;
-  currentSeed = null;
 }
 
 export async function updatePrivateState(state: VerdictPrivateState): Promise<void> {
-  console.log("[midnight-server] updatePrivateState()");
-  // The private state is managed by the leveldb provider.
-  // When we call contract.callTx.verifyTransition(), the witnesses read from this state.
-  // We need to update it before each verification.
   if (!providers) throw new Error("Not connected");
-
-  // Write to the private state store
   await providers.privateStateProvider.set(VerdictPrivateStateId, state);
   console.log("[midnight-server] Private state updated");
 }
