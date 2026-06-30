@@ -1,0 +1,4 @@
+/node_modules
+/dist
+/counter-cli/dist
+/contract/dist
