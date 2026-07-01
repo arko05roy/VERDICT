@@ -5,8 +5,9 @@
   --bg-secondary: #0a0a0a;
   --bg-tertiary: #111111;
   --bg-hover: #1a1a1a;
-  --border: #1e1e1e;
+  --border: #222222;
   --border-active: #2a2a2a;
+  --border-bright: #333333;
   --text-primary: #e0e0e0;
   --text-secondary: #666666;
   --text-muted: #3a3a3a;
@@ -110,4 +111,133 @@ body::after {
 }
 .deploy-success {
   animation: success-border 2s ease-in-out 3;
+}
+
+/* ── Brutalist Utilities ── */
+
+/* Corner frame accents — L-shaped corners on panels */
+.corner-frame {
+  position: relative;
+}
+.corner-frame::before,
+.corner-frame::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+}
+.corner-frame::before {
+  top: -1px;
+  left: -1px;
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid var(--border-bright);
+  border-left: 2px solid var(--border-bright);
+}
+.corner-frame::after {
+  bottom: -1px;
+  right: -1px;
+  width: 10px;
+  height: 10px;
+  border-bottom: 2px solid var(--border-bright);
+  border-right: 2px solid var(--border-bright);
+}
+
+/* Accent corner frame (green) */
+.corner-frame-accent::before {
+  border-color: var(--accent);
+}
+.corner-frame-accent::after {
+  border-color: var(--accent);
+}
+
+/* Dither separator */
+.dither-sep {
+  height: 2px;
+  background-image:
+    repeating-linear-gradient(90deg, var(--border-bright) 0px, var(--border-bright) 2px, transparent 2px, transparent 4px);
+  background-size: 4px 2px;
+}
+
+/* Dotted separator (row of dots) */
+.dot-sep {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+.dot-sep::before {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: repeating-linear-gradient(90deg, var(--border-bright) 0 2px, transparent 2px 6px);
+}
+.dot-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: repeating-linear-gradient(90deg, var(--border-bright) 0 2px, transparent 2px 6px);
+}
+
+/* Panel — combines border + noise + corner frame */
+.panel {
+  position: relative;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.025;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+}
+
+/* Brutalist button with hover corner accents */
+.btn-brutal {
+  position: relative;
+  transition: all 0.2s;
+}
+.btn-brutal::before,
+.btn-brutal::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.btn-brutal::before {
+  top: -2px;
+  left: -2px;
+  border-top: 1px solid white;
+  border-left: 1px solid white;
+}
+.btn-brutal::after {
+  bottom: -2px;
+  right: -2px;
+  border-bottom: 1px solid white;
+  border-right: 1px solid white;
+}
+.btn-brutal:hover::before,
+.btn-brutal:hover::after {
+  opacity: 1;
+}
+
+/* Dither pattern (vertical strip) */
+.dither-pattern {
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0px, transparent 1px, currentColor 1px, currentColor 2px),
+    repeating-linear-gradient(90deg, transparent 0px, transparent 1px, currentColor 1px, currentColor 2px);
+  background-size: 3px 3px;
+}
+
+/* Hard left accent for flagged/active rows */
+.row-flagged {
+  border-left: 2px solid var(--danger) !important;
+}
+.row-active-accent {
+  border-left: 2px solid var(--accent);
 }

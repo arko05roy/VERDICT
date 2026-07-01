@@ -13,14 +13,19 @@ export default function ExplorePage() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-lg text-[var(--text-primary)] font-bold tracking-wide">
+          <div className="flex items-center gap-2 mb-3 opacity-40">
+            <div className="w-6 h-px bg-white" />
+            <span className="text-white text-[10px]">◈</span>
+            <div className="w-16 h-px bg-white" />
+          </div>
+          <h1 className="text-lg text-white font-bold tracking-wide">
             Explore Rulesets
           </h1>
           <p className="text-[11px] text-[var(--text-muted)] mt-1">
             Browse deployed rule enforcement circuits on the network.
           </p>
         </div>
-        <div className="border border-[var(--border)] bg-[var(--bg-secondary)]">
+        <div className="panel corner-frame">
           <input
             className="bg-transparent px-3 py-1.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none font-mono w-64"
             placeholder="Search rulesets..."
@@ -29,7 +34,7 @@ export default function ExplorePage() {
       </div>
 
       {/* Table */}
-      <div className="border border-[var(--border)] noise">
+      <div className="panel corner-frame">
         <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] px-4 py-2 border-b border-[var(--border)] bg-[var(--bg-tertiary)]">
           {["RULESET", "CATEGORY", "VERIFICATIONS", "FLAGGED", "APPS", "STATUS"].map((h) => (
             <span key={h} className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
@@ -37,30 +42,31 @@ export default function ExplorePage() {
             </span>
           ))}
         </div>
+        <div className="mx-4"><div className="dither-sep" /></div>
         {RULESETS.map((r) => (
           <Link
             href={`/explore/${r.name}`}
             key={r.name}
-            className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] px-4 py-2.5 border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer group"
+            className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] px-4 py-2.5 border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer group border-l-2 border-l-transparent hover:border-l-white"
           >
             <div>
-              <span className="text-xs text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+              <span className="text-xs text-[var(--text-primary)] group-hover:text-white transition-colors">
                 {r.name}
               </span>
               <span className="text-[10px] text-[var(--text-muted)] ml-2">
                 {r.author}
               </span>
             </div>
-            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">
+            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] border border-[var(--border)] px-1.5 py-0.5 w-fit h-fit">
               {r.category}
             </span>
             <span className="text-xs text-[var(--text-primary)]">
               {r.verifications}
             </span>
-            <span className="text-xs text-[var(--accent-dim)]">{r.flagged}</span>
+            <span className="text-xs text-[var(--text-secondary)]">{r.flagged}</span>
             <span className="text-xs text-[var(--text-secondary)]">{r.apps}</span>
             <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] live-dot" />
+              <span className="w-1.5 h-1.5 bg-[var(--accent)] live-dot" />
               <span className="text-[10px] text-[var(--text-secondary)] uppercase">
                 {r.status}
               </span>
