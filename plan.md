@@ -153,16 +153,16 @@ Tick 1-N: Player plays normally       Batch collects transitions locally
 - **No game-specific code.** No chess. No PGN. No grid arena. Protocol only.
 
 #### Build Steps:
-- [ ] Step 5.1: Scaffold `verdict/` (Next.js + Tailwind)
-- [ ] Step 5.2: Layout + navigation (Deploy / Explore / Integrate tabs)
-- [ ] Step 5.3: Deploy tab — English input → Gemini API → Compact output → review → deploy
-- [ ] Step 5.4: Explore tab — browse deployed rulesets, search, filter
-- [ ] Step 5.5: Ruleset detail page — the "world" (stats, feed, rules, SDK, disputes)
-- [ ] Step 5.6: Integrate tab — pick ruleset → get SDK snippet → docs
-- [ ] Step 5.7: Gemini API integration (`/api/compile` route)
-- [ ] Step 5.8: Midnight deploy integration (`/api/deploy` route)
-- [ ] Step 5.9: Live verification feed (websocket or polling)
-- [ ] Step 5.10: Protocol-grade UI polish (dark theme, monospace, data-dense)
+- [x] Step 5.1: Scaffold `verdict/` (Next.js + Tailwind) ✅
+- [x] Step 5.2: Layout + sidebar navigation + separate pages (/, /deploy, /explore, /integrate) ✅
+- [x] Step 5.3: Deploy page — English input → Gemini API → Compact output → review → deploy ✅
+- [x] Step 5.4: Explore page — browse deployed rulesets table (mock data, search) ✅
+- [x] Step 5.5: Ruleset detail page — /explore/[id] with stats, live feed, rules, Compact source, SDK snippet, disputes ✅
+- [x] Step 5.6: Integrate page — pick ruleset → get SDK snippet → docs ✅
+- [x] Step 5.7: Gemini API integration (`/api/compile` route, gemini-2.5-flash) ✅
+- [x] Step 5.8: Deploy integration (`/api/deploy` route + full deploy flow with result UI) ✅
+- [x] Step 5.9: Live verification feed (`/api/feed` route + 5s polling on overview) ✅
+- [x] Step 5.10: Protocol-grade UI polish (animations, feed transitions, deploy success pulse) ✅
 
 ---
 
