@@ -1,6 +1,24 @@
-const SNIPPET = `import { Verdict } from "@verdict/sdk";
+"use client";
 
-const verdict = new Verdict("<RULESET_ADDRESS>");
+import { useState, useEffect, useMemo } from "react";
+
+type Ruleset = {
+  address: string;
+  name: string;
+  category: string;
+  description: string;
+};
+
+const LANGUAGES = ["TypeScript", "Python", "Rust", "Go"] as const;
+type Lang = (typeof LANGUAGES)[number];
+
+function getSnippet(lang: Lang, address: string): string {
+  const addr = address || "<RULESET_ADDRESS>";
+  switch (lang) {
+    case "TypeScript":
+      return `import { Verdict } from "@verdict/sdk";
+
+const verdict = new Verdict("${addr}");
 
 // Submit a state transition for verification
 const proof = await verdict.verify({
@@ -9,9 +27,118 @@ const proof = await verdict.verify({
   action: playerAction,
 });
 
-// proof.verdict === "CLEAN" | "FLAGGED"`;
+// proof.verdict === "CLEAN" | "FLAGGED"
+// proof.txHash — on-chain proof reference
+console.log(proof.verdict, proof.txHash);`;
+    case "Python":
+      return `from verdict import Verdict
+
+verdict = Verdict("${addr}")
+
+# Submit a state transition for verification
+proof = await verdict.verify(
+    prev_state=game_state.previous,
+    curr_state=game_state.current,
+    action=player_action,
+)
+
+# proof.verdict == "CLEAN" | "FLAGGED"
+# proof.tx_hash — on-chain proof reference
+print(proof.verdict, proof.tx_hash)`;
+    case "Rust":
+      return `use verdict_sdk::Verdict;
+
+let verdict = Verdict::new("${addr}");
+
+// Submit a state transition for verification
+let proof = verdict.verify(VerifyInput {
+    prev_state: game_state.previous,
+    curr_state: game_state.current,
+    action: player_action,
+}).await?;
+
+// proof.verdict == Verdict::Clean | Verdict::Flagged
+// proof.tx_hash — on-chain proof reference
+println!("{:?} {}", proof.verdict, proof.tx_hash);`;
+    case "Go":
+      return `import "github.com/verdict-protocol/verdict-go"
+
+v := verdict.New("${addr}")
+
+// Submit a state transition for verification
+proof, err := v.Verify(verdict.VerifyInput{
+    PrevState: gameState.Previous,
+    CurrState: gameState.Current,
+    Action:    playerAction,
+})
+
+// proof.Verdict == "CLEAN" | "FLAGGED"
+// proof.TxHash — on-chain proof reference
+fmt.Println(proof.Verdict, proof.TxHash)`;
+  }
+}
 
 export default function IntegratePage() {
+  const [rulesets, setRulesets] = useState<Ruleset[]>([]);
+  const [input, setInput] = useState("");
+  const [selectedAddress, setSelectedAddress] = useState("");
+  const [lang, setLang] = useState<Lang>("TypeScript");
+  const [copied, setCopied] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    async function fetchRulesets() {
+      try {
+        const res = await fetch("/api/rulesets");
+        const data = await res.json();
+        setRulesets(data.rulesets || []);
+      } catch {}
+    }
+    fetchRulesets();
+  }, []);
+
+  // Filter rulesets based on input (search by name, category, or address)
+  const filtered = useMemo(() => {
+    if (!input.trim()) return rulesets;
+    const q = input.toLowerCase();
+    return rulesets.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.category.toLowerCase().includes(q) ||
+        r.address.toLowerCase().includes(q)
+    );
+  }, [input, rulesets]);
+
+  // Resolve which address to use in the snippet
+  const resolvedAddress = useMemo(() => {
+    if (selectedAddress) return selectedAddress;
+    // If input looks like a hex address (32+ chars, hex only), use it directly
+    if (/^[0-9a-fA-F]{32,}$/.test(input.trim())) return input.trim();
+    return "";
+  }, [selectedAddress, input]);
+
+  const selectedRuleset = rulesets.find((r) => r.address === resolvedAddress);
+
+  const snippet = getSnippet(lang, resolvedAddress);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(snippet);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleSelect(r: Ruleset) {
+    setSelectedAddress(r.address);
+    setInput(r.name);
+    setDropdownOpen(false);
+  }
+
+  function handleInputChange(val: string) {
+    setInput(val);
+    setSelectedAddress("");
+    setDropdownOpen(true);
+  }
+
   return (
     <div className="p-6 max-w-3xl">
       <div className="mb-6">
@@ -29,7 +156,7 @@ export default function IntegratePage() {
       </div>
 
       {/* Ruleset selector */}
-      <div className="panel corner-frame mb-4">
+      <div className="panel corner-frame mb-4 relative">
         <div className="px-4 py-2 border-b border-[var(--border)]">
           <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
             Select Ruleset
@@ -37,34 +164,120 @@ export default function IntegratePage() {
         </div>
         <input
           className="w-full bg-transparent px-4 py-2.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none font-mono"
-          placeholder="Enter ruleset address or search by name..."
+          placeholder="Paste ruleset address or search by name..."
+          value={input}
+          onChange={(e) => handleInputChange(e.target.value)}
+          onFocus={() => setDropdownOpen(true)}
+          onBlur={() => setTimeout(() => setDropdownOpen(false), 200)}
         />
+
+        {/* Dropdown */}
+        {dropdownOpen && filtered.length > 0 && !selectedAddress && (
+          <div className="absolute left-0 right-0 top-full z-50 panel border border-[var(--border)] max-h-56 overflow-y-auto">
+            {filtered.map((r) => (
+              <button
+                key={r.address}
+                type="button"
+                className="w-full text-left px-4 py-2.5 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--border)] last:border-b-0 cursor-pointer"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSelect(r);
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-[var(--text-primary)]">
+                    {r.name}
+                  </span>
+                  <span className="text-[9px] uppercase tracking-wider text-[var(--text-muted)] border border-[var(--border)] px-1.5 py-0.5">
+                    {r.category}
+                  </span>
+                </div>
+                <span className="text-[10px] text-[var(--text-muted)] font-mono">
+                  {r.address.slice(0, 16)}...{r.address.slice(-8)}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Selected ruleset info */}
+      {selectedRuleset && (
+        <div className="panel corner-frame mb-4 px-4 py-3 flex items-center gap-3">
+          <span className="w-1.5 h-1.5 bg-[var(--accent)] live-dot shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs text-white font-bold">
+              {selectedRuleset.name}
+            </div>
+            <div className="text-[10px] text-[var(--text-muted)] font-mono truncate">
+              {selectedRuleset.address}
+            </div>
+          </div>
+          <span className="text-[9px] uppercase tracking-wider text-[var(--text-muted)] border border-[var(--border)] px-1.5 py-0.5 shrink-0">
+            {selectedRuleset.category}
+          </span>
+          <button
+            type="button"
+            className="text-[10px] text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer shrink-0"
+            onClick={() => {
+              setSelectedAddress("");
+              setInput("");
+            }}
+          >
+            clear
+          </button>
+        </div>
+      )}
+
+      {/* Language tabs */}
+      <div className="flex gap-0 mb-0">
+        {LANGUAGES.map((l) => (
+          <button
+            key={l}
+            type="button"
+            className={`text-[10px] uppercase tracking-wider px-3 py-1.5 border cursor-pointer transition-all ${
+              l === lang
+                ? "border-white text-white border-b-2 border-b-white bg-[var(--bg-hover)]"
+                : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--border-active)]"
+            }`}
+            onClick={() => setLang(l)}
+          >
+            {l}
+          </button>
+        ))}
       </div>
 
       {/* Code snippet */}
       <div className="panel corner-frame mb-6">
         <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border)]">
           <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
-            SDK Snippet · TypeScript
+            SDK Snippet · {lang}
           </span>
-          <button className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer">
-            Copy
+          <button
+            type="button"
+            className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer"
+            onClick={handleCopy}
+          >
+            {copied ? "Copied" : "Copy"}
           </button>
         </div>
         <pre className="p-4 text-xs leading-relaxed overflow-x-auto">
           <code>
-            {SNIPPET.split("\n").map((line, i) => (
+            {snippet.split("\n").map((line, i) => (
               <div key={i} className="flex">
                 <span className="w-8 text-right pr-3 text-[var(--text-muted)] select-none shrink-0">
                   {i + 1}
                 </span>
                 <span
                   className={
-                    line.startsWith("//")
+                    line.trimStart().startsWith("//") ||
+                    line.trimStart().startsWith("#")
                       ? "text-[var(--text-muted)]"
-                      : line.startsWith("import") || line.startsWith("const")
-                      ? "text-[var(--text-primary)]"
-                      : "text-[var(--text-secondary)]"
+                      : line.includes("import") ||
+                          line.includes("from ") ||
+                          line.includes("use ")
+                        ? "text-[var(--accent-dim)]"
+                        : "text-[var(--text-primary)]"
                   }
                 >
                   {line || "\u00A0"}
@@ -75,28 +288,7 @@ export default function IntegratePage() {
         </pre>
       </div>
 
-      {/* Language tabs — hard bottom border */}
-      <div className="mb-6">
-        <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2 block">
-          Also Available In
-        </span>
-        <div className="flex gap-0">
-          {["TypeScript", "Python", "Rust", "Go"].map((lang, i) => (
-            <span
-              key={lang}
-              className={`text-[10px] uppercase tracking-wider px-3 py-1.5 border cursor-pointer transition-all ${
-                i === 0
-                  ? "border-white text-white border-b-2 border-b-white bg-[var(--bg-hover)]"
-                  : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--border-active)]"
-              }`}
-            >
-              {lang}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* How it works — with dither separators between steps */}
+      {/* How it works */}
       <div className="panel corner-frame">
         <div className="px-4 py-2 border-b border-[var(--border)]">
           <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
@@ -105,10 +297,22 @@ export default function IntegratePage() {
         </div>
         <div className="p-4">
           {[
-            ["1", "Game client captures state transition (position, action, timing)"],
-            ["2", "SDK submits transition to VERDICT as a ZK witness (private)"],
-            ["3", "Circuit runs 10 integrity checks inside zero-knowledge proof"],
-            ["4", "Proof settles on Midnight — returns CLEAN or FLAGGED"],
+            [
+              "1",
+              "Game client captures state transition (position, action, timing)",
+            ],
+            [
+              "2",
+              "SDK submits transition to VERDICT as a ZK witness (private)",
+            ],
+            [
+              "3",
+              "Circuit runs 10 integrity checks inside zero-knowledge proof",
+            ],
+            [
+              "4",
+              "Proof settles on Midnight — returns CLEAN or FLAGGED",
+            ],
           ].map(([n, desc], i) => (
             <div key={n}>
               <div className="flex gap-3 items-start py-3">
