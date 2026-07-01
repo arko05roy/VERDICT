@@ -30,6 +30,8 @@ export default function DeployPage() {
   const [editedCompact, setEditedCompact] = useState("");
   const [validating, setValidating] = useState(false);
   const [compileAttempts, setCompileAttempts] = useState(0);
+  const [scaffoldEndLine, setScaffoldEndLine] = useState(0);
+  const [aiFixing, setAiFixing] = useState(false);
 
   // Fetch previously deployed rulesets
   useEffect(() => {
@@ -92,6 +94,7 @@ export default function DeployPage() {
       setCompileAttempts(data.attempts || 1);
       setNeedsHumanReview(data.needsHumanReview || false);
       setEditMode(data.needsHumanReview || false);
+      setScaffoldEndLine(data.scaffoldEndLine || 0);
       transitionTo(2);
     } catch (e: any) {
       setError(e.message || "Network error");
@@ -676,20 +679,60 @@ export default function DeployPage() {
                       onClick={async () => {
                         setValidating(true);
                         try {
+                          // Phase 1: Local validation
                           const res = await fetch("/api/validate", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ compact: editedCompact || compact }),
                           });
                           const data = await res.json();
+
+                          if (data.valid) {
+                            setValidationErrors([]);
+                            setNeedsHumanReview(false);
+                            return;
+                          }
+
+                          const hasRealErrors = (data.errors || []).some((e: any) => e.severity === "error");
+                          if (!hasRealErrors) {
+                            setValidationErrors(data.errors || []);
+                            setNeedsHumanReview(false);
+                            return;
+                          }
+
+                          // Phase 2: AI fix — send only broken chunk + errors
                           setValidationErrors(data.errors || []);
-                          if (data.valid) setNeedsHumanReview(false);
-                        } catch {} finally { setValidating(false); }
+                          setAiFixing(true);
+
+                          const fixRes = await fetch("/api/fix", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              compact: editedCompact || compact,
+                              errors: data.errors,
+                              scaffoldEndLine,
+                            }),
+                          });
+                          const fixData = await fixRes.json();
+
+                          if (fixRes.ok && fixData.compact) {
+                            setCompact(fixData.compact);
+                            setEditedCompact(fixData.compact);
+                            setValidationErrors(fixData.validation || []);
+                            const stillHasErrors = (fixData.validation || []).some(
+                              (e: any) => e.severity === "error"
+                            );
+                            setNeedsHumanReview(stillHasErrors);
+                          }
+                        } catch {} finally {
+                          setValidating(false);
+                          setAiFixing(false);
+                        }
                       }}
-                      disabled={validating}
+                      disabled={validating || aiFixing}
                       className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-white transition-colors cursor-pointer"
                     >
-                      {validating ? "Checking..." : "Re-validate"}
+                      {aiFixing ? "Fixing..." : validating ? "Checking..." : "Re-validate"}
                     </button>
                     {(editedCompact || compact) && (
                       <button
