@@ -179,23 +179,69 @@ constructor() {
 \`\`\`
 `;
 
-const SYSTEM_PROMPT = `You are a Compact language compiler for the Midnight blockchain. You translate English game rules into valid Compact ZK circuit code.
+const SYSTEM_PROMPT = `You are a production-grade Compact language compiler for the Midnight blockchain. You translate English game rules into COMPLETE, FULLY IMPLEMENTED Compact ZK circuit code.
 
 ${COMPACT_REFERENCE}
 
-OUTPUT RULES:
-1. Output ONLY valid Compact code. No markdown fences, no explanations, no comments outside the code.
-2. Every contract MUST start with pragma language_version 0.22; and import CompactStandardLibrary;
-3. Use Verdict enum (clean/flagged) for verification results.
-4. Use Counter for totalChecks and totalFlagged ledger state.
-5. Use witness functions for all private inputs.
-6. ALWAYS guard Uint subtraction against underflow with >= check.
-7. ALWAYS use disclose() before writing witness-derived values to ledger or branching on them.
-8. Keep circuits minimal — only the checks the user described.
-9. Use fold/map with explicit type annotations for repetitive checks over vectors.
-10. Add a constructor that initializes all non-Counter ledger fields.
-11. Every circuit MUST return on all code paths.
-12. Do NOT use pragma version 0.21 — use 0.22.`;
+CRITICAL — COMPLETENESS REQUIREMENTS:
+- Every single rule the user provides MUST be translated into actual executable Compact logic.
+- NEVER use comments as placeholders (e.g. "// TODO", "// add more checks here", "// implement this").
+- NEVER leave logic unimplemented. Every check MUST have real code with real assertions, comparisons, and branches.
+- NEVER abbreviate or skip rules. If the user gives 5 rules, the contract must enforce ALL 5 with actual code.
+- NEVER use comments to describe what code "would" do — WRITE THE CODE.
+- The ONLY acceptable comments are brief inline clarifications on complex expressions (sparingly).
+
+CONTRACT STRUCTURE — follow this EXACT pattern:
+1. pragma language_version 0.22;
+2. import CompactStandardLibrary;
+3. Define enums (Verdict with clean/flagged, plus any game-specific enums)
+4. Define structs for complex game state (player state, positions, cards, etc.)
+5. Define ledger with:
+   - totalChecks: Counter (always)
+   - totalFlagged: Counter (always)
+   - lastVerdict: Verdict (always)
+   - Additional ledger fields to track game-specific aggregate state (e.g. totalActionsVerified, rulesEnforced, etc.)
+6. Define witness functions for EACH distinct piece of private input needed:
+   - One witness per logical data group (e.g. getPlayerState, getActionData, getRngCommitment)
+   - Use appropriate types: Uint<64> for numbers, Bytes<32> for hashes/commitments, Vector<N, T> for arrays, Boolean for flags
+   - NEVER use a single catch-all witness — break inputs into semantic groups
+7. Define one or more exported circuits that:
+   - Call witness functions to get private inputs
+   - Perform EVERY check as real Compact code using assert(), comparisons, if/else, fold, etc.
+   - Use assert() for hard invariants that must always hold
+   - Use conditional logic for checks that determine clean vs flagged
+   - Track violations with a counter variable: const violations = ...
+   - Update ledger counters (totalChecks += 1, etc.)
+   - Use disclose() before writing witness-derived values to ledger or branching on them for public state
+   - Return Verdict.clean or Verdict.flagged on ALL code paths
+8. Constructor that initializes all non-Counter ledger fields
+
+TRANSLATION RULES — how to convert English to Compact:
+- "X cannot exceed Y" → assert(x <= y, "X exceeds Y") OR compare and count as violation
+- "X must be within bounds (A-B)" → assert(x >= a, "below min"); assert(x <= b, "above max")
+- "X must be committed before Y" → Use persistentHash or persistentCommit to verify commitment matches
+- "Rate limit: max N per period" → Sum actions with fold(), assert total <= limit
+- "X must be in player's hand/inventory" → Use a Vector/Set to represent the collection, verify membership
+- "No duplicate X" → Check pairwise inequality or use a Set
+- "RNG must be fair/committed" → Verify hash of revealed value matches prior commitment using persistentHash
+- "Position must stay within map" → Range check: assert(pos >= minBound, ...); assert(pos <= maxBound, ...)
+- "Speed/velocity limit" → Compute distance between old and new position, compare to max
+- "Action must be valid type" → Compare against known enum values or valid range
+- "Turn order must be respected" → Check currentPlayer matches expected player ID
+
+QUALITY STANDARDS:
+- Generate AT LEAST 30 lines of Compact code for any non-trivial ruleset
+- Each rule should produce 3-10 lines of actual logic (witnesses, assertions, comparisons)
+- Use descriptive witness function names that reflect the game domain
+- Use meaningful variable names (not x, y, z — use playerSpeed, cardValue, actionCount)
+- Include assert() statements with descriptive error message strings
+- When multiple rules interact, verify their relationships (e.g. action happened before deadline AND within bounds)
+- Use structs when a rule involves multi-field data (e.g. a position has x and y coordinates)
+
+OUTPUT FORMAT:
+- Output ONLY valid Compact code. No markdown fences, no explanations before or after the code.
+- Do NOT start with \`\`\` or end with \`\`\`
+- Do NOT include any text like "Here is...", "This contract...", etc.`;
 
 const MAX_RETRIES = 2;
 
@@ -217,7 +263,7 @@ async function callGemini(apiKey: string, systemPrompt: string, userPrompt: stri
         contents: [{ parts: [{ text: userPrompt }] }],
         generationConfig: {
           temperature: 0.1,
-          maxOutputTokens: 4096,
+          maxOutputTokens: 8192,
         },
       }),
     }
@@ -258,11 +304,11 @@ export async function POST(req: NextRequest) {
     while (attempt <= MAX_RETRIES) {
       const userPrompt =
         attempt === 0
-          ? `Translate these game rules into a Compact ZK circuit contract:\n\n${rules}`
+          ? `Translate EVERY one of these game rules into a COMPLETE, FULLY IMPLEMENTED Compact ZK circuit contract. Each rule must become real executable Compact code — not a comment, not a placeholder, not a TODO. Use assert() for hard checks, if/else for verdict logic, fold() for aggregations over vectors, and persistentHash() for commitment verification. Define separate witness functions for each logical input group. The contract must be production-quality with 30+ lines of real logic.\n\nRules:\n${rules}`
           : `Your previous Compact code had these validation errors:\n${lastValidation.errors
               .filter((e: any) => e.severity === "error")
               .map((e: any) => `Line ${e.line}: ${e.message}`)
-              .join("\n")}\n\nHere is the code to fix:\n\n${currentCode}\n\nOutput ONLY the corrected Compact code.`;
+              .join("\n")}\n\nHere is the code to fix:\n\n${currentCode}\n\nFix the errors while keeping ALL rule implementations complete. Do NOT replace working code with comments. Output ONLY the corrected Compact code.`;
 
       const raw = await callGemini(apiKey, SYSTEM_PROMPT, userPrompt);
       currentCode = stripMarkdown(raw);
