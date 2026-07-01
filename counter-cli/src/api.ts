@@ -40,7 +40,7 @@ let logger: Logger;
 globalThis.WebSocket = WebSocket;
 
 const verdictCompiledContract = CompiledContract.make('verdict', Verdict.Contract).pipe(
-  CompiledContract.withVacantWitnesses,
+  CompiledContract.withWitnesses(witnesses),
   CompiledContract.withCompiledFileAssets(contractConfig.zkConfigPath),
 );
 
@@ -238,7 +238,7 @@ const registerForDustGeneration = async (
 ): Promise<void> => {
   const state = await Rx.firstValueFrom(wallet.state().pipe(Rx.filter((s) => s.isSynced)));
   if (state.dust.availableCoins.length > 0) {
-    const dustBal = state.dust.walletBalance(new Date());
+    const dustBal = state.dust.balance(new Date());
     console.log(`  ✓ Dust tokens already available (${formatBalance(dustBal)} DUST)`);
     return;
   }
@@ -251,7 +251,7 @@ const registerForDustGeneration = async (
         wallet.state().pipe(
           Rx.throttleTime(5_000),
           Rx.filter((s) => s.isSynced),
-          Rx.filter((s) => s.dust.walletBalance(new Date()) > 0n),
+          Rx.filter((s) => s.dust.balance(new Date()) > 0n),
         ),
       ),
     );
@@ -271,7 +271,7 @@ const registerForDustGeneration = async (
       wallet.state().pipe(
         Rx.throttleTime(5_000),
         Rx.filter((s) => s.isSynced),
-        Rx.filter((s) => s.dust.walletBalance(new Date()) > 0n),
+        Rx.filter((s) => s.dust.balance(new Date()) > 0n),
       ),
     ),
   );
@@ -286,15 +286,28 @@ export const buildWalletAndWaitForFunds = async (config: Config, seed: string): 
       const shieldedSecretKeys = ledger.ZswapSecretKeys.fromSeed(keys[Roles.Zswap]);
       const dustSecretKey = ledger.DustSecretKey.fromSeed(keys[Roles.Dust]);
       const unshieldedKeystore = createKeystore(keys[Roles.NightExternal], getNetworkId());
-      const shieldedWallet = ShieldedWallet(buildShieldedConfig(config)).startWithSecretKeys(shieldedSecretKeys);
-      const unshieldedWallet = UnshieldedWallet(buildUnshieldedConfig(config)).startWithPublicKey(
-        PublicKey.fromKeyStore(unshieldedKeystore),
-      );
-      const dustWallet = DustWallet(buildDustConfig(config)).startWithSecretKey(
-        dustSecretKey,
-        ledger.LedgerParameters.initialParameters().dust,
-      );
-      const wallet = new WalletFacade(shieldedWallet, unshieldedWallet, dustWallet);
+      const wallet = await WalletFacade.init({
+        configuration: {
+          ...buildShieldedConfig(config),
+          ...buildUnshieldedConfig(config),
+          ...buildDustConfig(config),
+        },
+        shielded: (cfg) => ShieldedWallet(cfg).startWithSecretKeys(shieldedSecretKeys),
+        unshielded: (cfg) =>
+          UnshieldedWallet({
+            networkId: cfg.networkId,
+            indexerClientConnection: cfg.indexerClientConnection,
+            txHistoryStorage: cfg.txHistoryStorage,
+          }).startWithPublicKey(PublicKey.fromKeyStore(unshieldedKeystore)),
+        dust: (cfg) =>
+          DustWallet({
+            networkId: cfg.networkId,
+            costParameters: cfg.costParameters,
+            indexerClientConnection: cfg.indexerClientConnection,
+            provingServerUrl: cfg.provingServerUrl,
+            relayURL: cfg.relayURL,
+          }).startWithSecretKey(dustSecretKey, ledger.LedgerParameters.initialParameters().dust),
+      });
       await wallet.start(shieldedSecretKeys, dustSecretKey);
       return { wallet, shieldedSecretKeys, dustSecretKey, unshieldedKeystore };
     },

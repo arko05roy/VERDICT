@@ -6,7 +6,8 @@
   "workspaces": [
     "counter-cli",
     "contract",
-    "verdict-demo"
+    "verdict-demo",
+    "verdict"
   ],
   "devDependencies": {
     "@eslint/js": "^9.39.2",
