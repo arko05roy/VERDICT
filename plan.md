@@ -101,76 +101,68 @@ Tick 1-N: Player plays normally       Batch collects transitions locally
 
 ---
 
-## BUILD STATUS — Steps 1, 2, 3 & 4 COMPLETE
+## BUILD STATUS
 
-### Step 4: Full Protocol Dashboard + ZK Integration ✅ (Phase 2)
+### Backend (DONE)
+- **ZK Circuit:** `contract/src/verdict.compact` — 10 checks, compiles, 10/10 tests pass
+- **Witness Provider:** `contract/src/witnesses.ts` — all 12 witness functions
+- **Midnight SDK:** wallet, deploy, prove, ledger read (SDK 2.0.0)
+- **Docker:** standalone.yml with node 0.21.0, indexer 3.1.0, proof-server 7.0.0
 
-**Frontend rebuilt from toy grid demo → full protocol product.**
+### Frontend v3: Protocol Infrastructure App (IN PROGRESS)
 
-#### 10 Feature Pages (all built, all routes live):
-- `/replay` — Game Replay Verifier (PGN → move-by-move ZK analysis)
-- `/rules` — English → ZK Rules (natural language → GameRules params)
-- `/dispute` — ZK Dispute Court (side-by-side player comparison)
-- `/collusion` — Collusion Detector (cross-player correlation analysis)
-- `/passport` — Player Integrity Passport (on-chain reputation)
-- `/staking` — Clean Play Staking (stake → verify → yield/slash)
-- `/compliance` — Regulatory Compliance (audit reports for gambling regs)
-- `/audit` — Casino/RNG Auditor (entropy, chi-squared, distribution charts)
-- `/marketplace` — Rule Marketplace (browse/create/share rulesets)
-- `/betting` — Betting Market Layer (verify before settling)
-- `/` — Landing page with pipeline diagram + feature grid
+**Old verdict-demo/ DELETED.** New app: `verdict/` — built from scratch.
 
-#### ZK Integration Architecture:
-- **API Route:** `app/api/midnight/route.ts` — server-side Midnight SDK calls
-- **Server Layer:** `lib/midnight-server.ts` — wallet, deploy, prove, ledger read (SDK 2.0.0)
-- **Client Layer:** `lib/midnight.ts` — frontend calls API route, no local fallback
-- **Replay Parser:** `lib/replay-parser.ts` — async, each move goes through ZK circuit
-- **Chess Adapter:** `game/chess-adapter.ts` — chess.js moves → VERDICT GameState
-- **All verification routes through `/api/midnight` → proof-server → chain**
-- **No mock data, no hardcoded values, no local verification fallback**
+**Core concept:** VERDICT is infrastructure. Like Ethereum doesn't have a "smart contract builder with templates." You deploy contracts, you see the network, you plug in. VERDICT is the same but for rule enforcement.
 
-#### Infrastructure:
-- **Docker:** `standalone.yml` with node 0.21.0, indexer 3.1.0, proof-server 7.0.0
-- **SDK versions:** wallet-sdk 2.0.0, network-id 3.1.0, ledger-v7 7.0.2 (matches midnight-local-dev)
-- **Wallet:** Pre-funded genesis seed for standalone (no faucet needed)
-- **Auto-connect:** API route auto-connects + deploys on first verification request
+**The primitive:** English rules in → Gemini compiles to Compact → deploy on-chain → get SDK back. Each deployed ruleset is a living ecosystem.
 
-#### Components (9 new):
-- `Navbar.tsx` — protocol navigation (11 links)
-- `ReplayTimeline.tsx` — move-by-move analysis with verdict badges
-- `RuleEditor.tsx` — grouped parameter editor
-- `DisputeView.tsx` — side-by-side comparison with ruling
-- `CheckPipeline.tsx` — 10-check architecture diagram
-- `IntegrityBadge.tsx` — passport credential card with SVG ring
-- `StakingDashboard.tsx` — stake/yield/progress tracking
-- `AuditReport.tsx` — formal compliance report layout
-- `MarketplaceGrid.tsx` — responsive ruleset card grid
+#### Architecture: Deploy / Explore / Integrate (tabs, one page — like Uniswap)
 
-#### Libs (9 new):
-- `replay-parser.ts`, `chess-adapter.ts`, `famous-games.ts`
-- `rule-generator.ts`, `collusion-analyzer.ts`, `passport.ts`
-- `compliance-report.ts`, `marketplace.ts`, `betting-verifier.ts`, `rng-auditor.ts`
+**Deploy tab:**
+1. User writes rules in freeform English ("players can't move faster than 5 units, cards must be in hand, RNG committed before bet")
+2. Gemini API (free) translates English → Compact contract code
+3. Show generated Compact + human-readable summary for review
+4. User confirms → Compact compiler validates → deploy on-chain
+5. Return: contract address + 2-line SDK snippet
+6. Metadata: name, description, category, author
 
-#### Current Blocker: Proof Server Performance on Apple Silicon
-- Wallet connects ✅ (2.5M tNight from genesis)
-- Contract deployment sends to proof server ✅
-- Proof server receives `/prove` request and starts computing ✅
-- **Proof generation takes 45+ min on M-series Mac Docker** — SDK times out at ~7 min
-- Error: `Failed to prove transaction` (SDK gives up before proof completes)
-- Root cause: Zswap dust/spend proof is CPU-heavy, single-threaded, ~100% CPU for 45+ min
-- This is the first-time cost (key compilation + proof); subsequent proofs should be faster
-- **Needs:** Either wait for first proof to cache, or run on x86 machine, or use midnight-local-dev warmup
+**Explore tab:**
+- Browse all deployed rulesets on the network
+- Each ruleset card: name, description, category, verification count, connected apps, deploy date
+- Click into a ruleset → its world:
+  - Live verification feed (proofs flowing)
+  - Stats (total verifications, flagged %, uptime)
+  - Connected games/apps
+  - The rules (Compact source, human-readable)
+  - SDK snippet to integrate
+  - Disputes / flags
 
-#### What Works Right Now:
-- `npm run build` — clean, all 15 routes
-- `npm run dev` — serves at localhost:3000
-- Docker containers start and are healthy (node, indexer, proof-server)
-- Wallet connects to local node with real SDK 2.0.0
-- API route receives witness data and calls real Midnight SDK
-- PGN parsing works (chess.js)
-- GameState → VerdictPrivateState witness mapping works
-- Console.log debugging throughout entire pipeline
-- `cd contract && npm test` — ZK circuit tests still pass (10/10)
+**Integrate tab:**
+- Pick an existing ruleset from explore
+- Or enter a ruleset address
+- Get SDK snippet (2 lines) for your app
+- Docs: how to send state transitions, how to read verdicts
+- Language examples: TypeScript, Python, Rust, Go
+
+#### Technical Stack:
+- **Framework:** Next.js 14 (App Router) + TypeScript + Tailwind CSS
+- **LLM:** Gemini API (free tier) for English → Compact translation
+- **Chain:** Midnight (Compact ZK circuits, dual-ledger)
+- **API Routes:** `/api/compile` (English → Compact via Gemini), `/api/deploy`, `/api/verify`
+- **No game-specific code.** No chess. No PGN. No grid arena. Protocol only.
+
+#### Build Steps:
+- [ ] Step 5.1: Scaffold `verdict/` (Next.js + Tailwind)
+- [ ] Step 5.2: Layout + navigation (Deploy / Explore / Integrate tabs)
+- [ ] Step 5.3: Deploy tab — English input → Gemini API → Compact output → review → deploy
+- [ ] Step 5.4: Explore tab — browse deployed rulesets, search, filter
+- [ ] Step 5.5: Ruleset detail page — the "world" (stats, feed, rules, SDK, disputes)
+- [ ] Step 5.6: Integrate tab — pick ruleset → get SDK snippet → docs
+- [ ] Step 5.7: Gemini API integration (`/api/compile` route)
+- [ ] Step 5.8: Midnight deploy integration (`/api/deploy` route)
+- [ ] Step 5.9: Live verification feed (websocket or polling)
+- [ ] Step 5.10: Protocol-grade UI polish (dark theme, monospace, data-dense)
 
 ---
 
