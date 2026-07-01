@@ -4,15 +4,15 @@
 
 > *[Screen: Landing page with animated background, "VERDICT" title]*
 
-"Let me ask you something. When you play a game online — Valorant, poker, anything — how do you know the server isn't lying to you?
+"Every day, you interact with systems that enforce rules you cannot verify.
 
-You don't.
+Your insurance claim — processed by an algorithm you can't inspect. Your trade on an exchange — executed at a price you have to trust. Your loan application — scored by a model that won't show its math. Your game — adjudicated by a server that could be lying about every outcome.
 
-Right now, every multiplayer game on the planet runs on the same architecture: a central server that processes your inputs, updates game state, and tells you what happened. You trust that server completely. Your rank, your money, your items — all of it depends on a black box you cannot inspect.
+These aren't edge cases. This is the default. Every platform, every service, every institution that processes your data runs the same architecture: a black box that takes your inputs, applies rules internally, and tells you what happened. You have no proof the rules were followed. None.
 
-And here's the thing nobody talks about: **it's not just games.** Any rule-based system — casino platforms, competitive esports, play-to-earn economies — they all have the same fundamental flaw. The entity enforcing the rules is the same entity that profits from breaking them.
+And here's the structural problem: **the entity enforcing the rules is often the same entity that profits from breaking them.**
 
-There is zero cryptographic proof that any rule was ever enforced. None. You're trusting a `console.log` on someone else's server.
+There is zero cryptographic proof that any rule was ever applied correctly. You're trusting a `console.log` on someone else's server.
 
 That's not integrity. That's faith.
 
@@ -26,17 +26,17 @@ That's not integrity. That's faith.
 
 > *[Screen: Overview dashboard — stats, live feed, network status]*
 
-"Verdict is a universal ZK integrity protocol built on Midnight. It doesn't replace game servers. It doesn't touch gameplay. It sits underneath and asks one question: **was this state transition valid?**
+"Verdict is a universal ZK integrity protocol built on Midnight. It doesn't replace existing systems. It doesn't touch business logic. It sits underneath and asks one question: **was this state transition valid?**
 
-What you're looking at is the protocol dashboard. Live verifications streaming in — each one is a game state transition being checked by a ZK circuit. 10 mathematical checks per transition. Velocity bounds, action validity, behavioral entropy, commit-reveal verification — the works.
+What you're looking at is the protocol dashboard. Live verifications streaming in — each one is a state transition being checked by a ZK circuit. 10 mathematical checks per transition. Bounds validation, action legitimacy, behavioral entropy, commit-reveal verification — the works.
 
-See this? *[point to a CLEAN entry]* Clean. The server played fair. And this one? *[point to FLAGGED]* Flagged. 9 out of 10 checks passed, one failed. That's not a ban — that's a **proof**. Immutable, on-chain, verifiable by anyone.
+See this? *[point to a CLEAN entry]* Clean. The system followed its own rules. And this one? *[point to FLAGGED]* Flagged. 9 out of 10 checks passed, one failed. That's not an accusation — that's a **proof**. Immutable, on-chain, verifiable by anyone.
 
 Now here's what makes this a protocol and not a product—"
 
 > *[Click to Explore page]*
 
-"Every game gets its own ruleset. FPS anti-cheat, poker fairness, MMO economy validation, chess move integrity — each one is a deployed Compact contract on Midnight. Different rules, same verification engine. You don't build a new system per game. You deploy a ruleset."
+"Every system gets its own ruleset. Insurance claim processing, exchange trade execution, game anti-cheat, lending compliance — each one is a deployed Compact contract on Midnight. Different rules, same verification engine. You don't build a new system per use case. You deploy a ruleset."
 
 ---
 
@@ -48,13 +48,13 @@ Now here's what makes this a protocol and not a product—"
 
 I write rules in plain English."
 
-> *[Type or show example rules: "Players cannot move faster than 5 units per tick. Cards must be in hand before playing. Health cannot go below zero."]*
+> *[Type or show example rules: "Claim payouts must match the policy tier. Trade execution price cannot deviate more than 0.1% from quoted price. Player health cannot go below zero."]*
 
 "Hit compile. Verdict takes these rules, translates them into a Compact ZK circuit — Midnight's native language — validates the syntax, and gives me a deployable contract.
 
 *[Show compiled Compact code in Review step]*
 
-This is real Compact. Pragma 0.22. It runs inside Midnight's ZK prover. The game server never sees player data. The circuit sees **witnesses** — private inputs that get verified and discarded. That's the Midnight primitive doing what it was built for.
+This is real Compact. Pragma 0.22. It runs inside Midnight's ZK prover. The system under verification never sees the private data. The circuit sees **witnesses** — private inputs that get verified and discarded. That's the Midnight primitive doing what it was built for.
 
 *[Click Deploy]*
 
@@ -78,7 +78,7 @@ const verdict = new Verdict('midnight1_abc123...')
 const result = await verdict.verify({ prevState, currState, action })
 ```
 
-Your game captures a state transition. The SDK submits it as a ZK witness — **private by default**. The circuit runs 10 checks. The proof settles on Midnight. You get back CLEAN or FLAGGED. The player's data, strategy, position — none of it is ever revealed. Not to you, not to anyone.
+Your system captures a state transition. The SDK submits it as a ZK witness — **private by default**. The circuit runs 10 checks. The proof settles on Midnight. You get back CLEAN or FLAGGED. The user's data, the internal state, the business logic — none of it is ever revealed. Not to you, not to anyone.
 
 TypeScript, Python, Rust, Go. Pick your stack. Plug in the address. You're done."
 
@@ -86,15 +86,15 @@ TypeScript, Python, Rust, Go. Pick your stack. Plug in the address. You're done.
 
 ### ACT 5: THE CLOSE — Explore/[id] (3:20 – 3:45)
 
-> *[Click back to Explore, click into a specific ruleset like "Valorant Anti-Cheat Module"]*
+> *[Click back to Explore, click into a specific ruleset like "FinServ Trade Execution Integrity"]*
 
 "And this is what accountability looks like. Every ruleset has a public integrity profile. Total verifications. Flagged rate. Integrity score. All on-chain. All auditable.
 
 *[Point to the stats: 14,832 verifications, 1.7% flagged rate]*
 
-No more trusting game companies when they say 'we take cheating seriously.' Show me the proof. Literally.
+No more trusting platforms when they say 'we follow the rules.' Show me the proof. Literally.
 
-**Verdict doesn't ask game servers to be honest. It makes dishonesty mathematically impossible.**
+**Verdict doesn't ask systems to be honest. It makes dishonesty mathematically impossible.**
 
 The ZK circuit doesn't care who you are. It cares whether the rules were followed. And on Midnight, that proof is private, compact, and permanent.
 
