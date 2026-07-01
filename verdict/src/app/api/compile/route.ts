@@ -94,116 +94,83 @@ Compact language reference (Midnight ZK circuit language, version 0.22):
 7. Struct fields CANNOT reference their own struct type
 8. Reserved keywords: export, import, module, circuit, witness, ledger, sealed, const, if, else, for, return, true, false, default, assert, pad, as, struct, enum, contract, pure, fold, map
 
-## FULL EXAMPLE — Multi-rule FPS integrity contract with edge cases
-Rules: "Players cannot move faster than 5 units per tick, Position must stay within map bounds (0-1000), No action can exceed 10 per second, RNG must be committed before the bet is placed, Cards must be in the player's hand before playing"
-
+## Example 1: Simple threshold check
 \`\`\`compact
 pragma language_version 0.22;
 import CompactStandardLibrary;
 
 enum Verdict { clean, flagged }
 
-struct Position {
-  x: Uint<64>,
-  y: Uint<64>
+export ledger {
+  totalChecks: Counter,
+  totalFlagged: Counter,
+  lastVerdict: Verdict
 }
+
+witness getState(): Vector<3, Uint<64>>;
+witness getThreshold(): Uint<64>;
+
+export circuit verify(): Verdict {
+  const state = getState();
+  const threshold = getThreshold();
+  const value = state[0];
+  const valid = value <= threshold;
+
+  totalChecks += 1;
+
+  if (disclose(valid)) {
+    lastVerdict = Verdict.clean;
+    return Verdict.clean;
+  } else {
+    totalFlagged += 1;
+    lastVerdict = Verdict.flagged;
+    return Verdict.flagged;
+  }
+}
+
+constructor() {
+  lastVerdict = Verdict.clean;
+}
+\`\`\`
+
+## Example 2: Vector checks with fold
+\`\`\`compact
+pragma language_version 0.22;
+import CompactStandardLibrary;
+
+enum Verdict { clean, flagged }
 
 export ledger {
   totalChecks: Counter,
   totalFlagged: Counter,
-  lastVerdict: Verdict,
-  totalClean: Counter
+  lastVerdict: Verdict
 }
 
-witness getPreviousPosition(): Position;
-witness getCurrentPosition(): Position;
-witness getMaxSpeed(): Uint<64>;
-witness getActionTimestamps(): Vector<16, Uint<64>>;
-witness getActionCount(): Uint<64>;
-witness getMaxActionsPerSecond(): Uint<64>;
-witness getTimestampWindowStart(): Uint<64>;
-witness getTimestampWindowEnd(): Uint<64>;
-witness getRngRevealedValue(): Uint<64>;
-witness getRngRandomness(): Bytes<32>;
-witness getRngCommitmentOnLedger(): Bytes<32>;
-witness getBetTimestamp(): Uint<64>;
-witness getRngCommitTimestamp(): Uint<64>;
-witness getPlayerHand(): Vector<8, Uint<64>>;
-witness getPlayedCard(): Uint<64>;
-witness getMapMinBound(): Uint<64>;
-witness getMapMaxBound(): Uint<64>;
+witness getActions(): Vector<8, Uint<64>>;
+witness getMaxRate(): Uint<64>;
 
-export circuit verifyGameIntegrity(): Verdict {
-  const prevPos = getPreviousPosition();
-  const currPos = getCurrentPosition();
-  const maxSpeed = getMaxSpeed();
+export circuit verifyRate(): Verdict {
+  const actions = getActions();
+  const maxRate = getMaxRate();
 
-  // --- Rule 1: Speed check with underflow-safe distance ---
-  const dx = (currPos.x >= prevPos.x) ? (currPos.x - prevPos.x) : (prevPos.x - currPos.x);
-  const dy = (currPos.y >= prevPos.y) ? (currPos.y - prevPos.y) : (prevPos.y - currPos.y);
-  const distanceSquared = (dx * dx + dy * dy) as Uint<64>;
-  const maxDistSquared = (maxSpeed * maxSpeed) as Uint<64>;
-  assert(distanceSquared <= maxDistSquared, "movement speed exceeds maximum allowed per tick");
-
-  // --- Rule 2: Map bounds (both axes, both min and max) ---
-  const mapMin = getMapMinBound();
-  const mapMax = getMapMaxBound();
-  assert(currPos.x >= mapMin, "x position below map minimum");
-  assert(currPos.x <= mapMax, "x position above map maximum");
-  assert(currPos.y >= mapMin, "y position below map minimum");
-  assert(currPos.y <= mapMax, "y position above map maximum");
-  assert(prevPos.x >= mapMin, "previous x position below map minimum");
-  assert(prevPos.x <= mapMax, "previous x position above map maximum");
-  assert(prevPos.y >= mapMin, "previous y position below map minimum");
-  assert(prevPos.y <= mapMax, "previous y position above map maximum");
-
-  // --- Rule 3: Rate limiting (sum actions in window, compare to max) ---
-  const actions = getActionTimestamps();
-  const actionCount = getActionCount();
-  const windowStart = getTimestampWindowStart();
-  const windowEnd = getTimestampWindowEnd();
-  assert(windowEnd >= windowStart, "time window end must be >= start");
-  const maxRate = getMaxActionsPerSecond();
-  const windowDuration = (windowEnd - windowStart) as Uint<64>;
-  const maxAllowed = (windowDuration > 0 as Uint<64>) ? ((maxRate * windowDuration) as Uint<64>) : maxRate;
-  assert(actionCount <= maxAllowed, "action rate exceeds maximum per second");
-
-  const actionsInWindow = fold(
-    (acc: Uint<64>, ts: Uint<64>) => (
-      (ts >= windowStart && ts <= windowEnd) ? ((acc + 1) as Uint<64>) : acc
-    ) as Uint<64>,
+  const total = fold(
+    (acc: Uint<64>, a: Uint<64>) => (acc + a) as Uint<64>,
     0 as Uint<64>,
     actions
   );
-  assert(actionsInWindow <= maxAllowed, "counted actions in window exceed rate limit");
 
-  // --- Rule 4: RNG commitment verification (commit-reveal) ---
-  const rngRevealed = getRngRevealedValue();
-  const rngRandomness = getRngRandomness();
-  const rngCommitOnLedger = getRngCommitmentOnLedger();
-  const recomputedCommit = persistentCommit<Uint<64>>(rngRevealed, rngRandomness);
-  assert(recomputedCommit == rngCommitOnLedger, "RNG revealed value does not match prior commitment");
-  const betTs = getBetTimestamp();
-  const commitTs = getRngCommitTimestamp();
-  assert(commitTs <= betTs, "RNG must be committed before the bet is placed");
+  const withinLimit = total <= maxRate;
 
-  // --- Rule 5: Card must be in hand (check played card exists in hand vector) ---
-  const hand = getPlayerHand();
-  const played = getPlayedCard();
-  const cardFound = fold(
-    (acc: Uint<64>, card: Uint<64>) => (
-      (card == played) ? ((acc + 1) as Uint<64>) : acc
-    ) as Uint<64>,
-    0 as Uint<64>,
-    hand
-  );
-  assert(cardFound >= (1 as Uint<64>), "played card not found in player hand");
-
-  // --- All checks passed ---
   totalChecks += 1;
-  totalClean += 1;
-  lastVerdict = disclose(Verdict.clean);
-  return Verdict.clean;
+
+  if (disclose(withinLimit)) {
+    lastVerdict = Verdict.clean;
+    return Verdict.clean;
+  } else {
+    totalFlagged += 1;
+    lastVerdict = Verdict.flagged;
+    return Verdict.flagged;
+  }
 }
 
 constructor() {
@@ -249,78 +216,34 @@ CONTRACT STRUCTURE — follow this EXACT pattern:
    - Return Verdict.clean or Verdict.flagged on ALL code paths
 8. Constructor that initializes all non-Counter ledger fields
 
-RULE DECOMPOSITION FRAMEWORK — apply this to ANY rule, from ANY domain:
-Do NOT rely on pattern matching against known game types. Instead, decompose every rule using these 5 steps:
-
-STEP 1 — IDENTIFY THE CONSTRAINT TYPE:
-Every rule falls into one or more of these universal categories:
-  a) COMPARISON: "X must/cannot be [more/less/equal] than Y" → assert(x op y, msg)
-  b) RANGE/BOUNDS: "X must be between A and B" → assert(x >= a); assert(x <= b)
-  c) ORDERING: "X must happen before/after Y" → assert(timestampX <= timestampY)
-  d) MEMBERSHIP: "X must be in/part of Y" → fold over collection, count matches, assert >= 1
-  e) UNIQUENESS: "no duplicate X" → pairwise inequality check or count == 1
-  f) RATE/QUOTA: "at most N of X per Y" → fold to count, assert count <= limit
-  g) CONSERVATION: "total X must remain constant" (e.g. total chips, total supply) → assert(before == after)
-  h) INTEGRITY: "X must match committed/hashed value" → recompute hash/commitment, assert equality
-  i) STATE TRANSITION: "X can only change from A to B" → assert(oldState == A); assert(newState == B)
-  j) DEPENDENCY: "X requires Y" (prerequisite) → assert Y is satisfied before checking X
-  k) EXCLUSION: "X and Y cannot both be true" → assert(!(condX && condY))
-  l) ACCUMULATION: "sum/total of X must satisfy Y" → fold to sum, then assert against Y
-  m) PROPORTIONAL: "X must be at most N% of Y" → assert(x * 100 <= y * n) (avoid division)
-
-STEP 2 — IDENTIFY REQUIRED DATA:
-For each constraint, determine:
-  - What private inputs are needed? → define witness functions (one per logical group)
-  - What types? Numbers → Uint<64>, hashes → Bytes<32>, collections → Vector<N, T>, flags → Boolean, compound → struct
-  - What previous/reference state is needed? → separate witness for before-state vs after-state
-
-STEP 3 — IMPLEMENT THE CHECK:
-Write real Compact code using:
-  - assert(condition, "descriptive message") for hard invariants
-  - if/else branching for soft checks that determine clean vs flagged
-  - fold() with typed accumulator for aggregations over vectors
-  - persistentHash<T>/persistentCommit<T> for cryptographic verification
-  - Structs for multi-field data
-
-STEP 4 — ADD EDGE CASE GUARDS (mandatory for every check):
-For EVERY constraint, ask: "What malicious input could bypass this?"
-  - ARITHMETIC: guard ALL subtractions with (a >= b) ? (a - b) : (b - a), cast multiplications with \`as Uint<64>\`, guard divisions against zero
-  - BOUNDS: always check BOTH min AND max, check ALL dimensions/fields, check BOTH current AND previous state
-  - COLLECTIONS: scan ENTIRE collection with fold, never check only first/last element
-  - TRUST NOTHING: witnesses are untrusted — add assert() sanity checks on inputs (non-zero, within sane ranges, valid enum values)
-  - RECOMPUTE: never trust a witness-provided boolean/result — recompute the check inside the circuit
-  - OVERFLOW: cast arithmetic with \`as Uint<64>\`, use proportional checks (a * d <= b * c) instead of division
-
-STEP 5 — CROSS-RULE INTERACTIONS:
-Check if rules depend on each other:
-  - If rule A validates input and rule B uses that input → enforce A before B
-  - If two rules share the same data → use the same witness, don't fetch twice
-  - If rules are contradictory → the circuit should detect and flag
-
-COMMON DOMAIN PATTERNS (examples, not exhaustive — apply the framework above to ANY domain):
-  - Games: movement limits, inventory checks, turn order, score bounds, RNG fairness
-  - Auctions: bid >= minimum, bid <= balance, no self-bidding, ascending order, time window
-  - Trading: balance conservation, price bounds, slippage limits, trade size caps
-  - Voting: one vote per participant, vote within options, tally integrity, deadline enforcement
-  - Puzzles: state transition validity, move legality, solution verification, step count limits
-  - Supply chain: quantity conservation, timestamp ordering, signature verification, origin validation
+TRANSLATION RULES — how to convert English to Compact:
+- "X cannot exceed Y" → assert(x <= y, "X exceeds Y") OR compare and count as violation
+- "X must be within bounds (A-B)" → assert(x >= a, "below min"); assert(x <= b, "above max")
+- "X must be committed before Y" → Use persistentHash or persistentCommit to verify commitment matches
+- "Rate limit: max N per period" → Sum actions with fold(), assert total <= limit
+- "X must be in player's hand/inventory" → Use a Vector/Set to represent the collection, verify membership
+- "No duplicate X" → Check pairwise inequality or use a Set
+- "RNG must be fair/committed" → Verify hash of revealed value matches prior commitment using persistentHash
+- "Position must stay within map" → Range check: assert(pos >= minBound, ...); assert(pos <= maxBound, ...)
+- "Speed/velocity limit" → Compute distance between old and new position, compare to max
+- "Action must be valid type" → Compare against known enum values or valid range
+- "Turn order must be respected" → Check currentPlayer matches expected player ID
 
 QUALITY STANDARDS:
-- Generate AT LEAST 50 lines of Compact code for any non-trivial ruleset (edge cases add real code)
-- Each rule should produce 5-15 lines of actual logic (witnesses, validations, assertions, edge case guards)
+- Generate AT LEAST 30 lines of Compact code for any non-trivial ruleset
+- Each rule should produce 3-10 lines of actual logic (witnesses, assertions, comparisons)
 - Use descriptive witness function names that reflect the game domain
 - Use meaningful variable names (not x, y, z — use playerSpeed, cardValue, actionCount)
-- EVERY assert() MUST have a descriptive error message string explaining what went wrong
+- Include assert() statements with descriptive error message strings
 - When multiple rules interact, verify their relationships (e.g. action happened before deadline AND within bounds)
 - Use structs when a rule involves multi-field data (e.g. a position has x and y coordinates)
-- Use separate witness functions for each logical input group — do NOT bundle unrelated data
 
 OUTPUT FORMAT:
 - Output ONLY valid Compact code. No markdown fences, no explanations before or after the code.
 - Do NOT start with \`\`\` or end with \`\`\`
 - Do NOT include any text like "Here is...", "This contract...", etc.`;
 
-const MAX_ITERATIONS = 4; // generate → self-review → refine (up to 4 cycles for edge case coverage)
+const MAX_RETRIES = 2;
 
 function stripMarkdown(text: string): string {
   return text
@@ -329,7 +252,7 @@ function stripMarkdown(text: string): string {
     .trim();
 }
 
-async function callGemini(apiKey: string, systemPrompt: string, userPrompt: string, temperature = 0.1): Promise<string> {
+async function callGemini(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
     {
@@ -339,7 +262,7 @@ async function callGemini(apiKey: string, systemPrompt: string, userPrompt: stri
         system_instruction: { parts: [{ text: systemPrompt }] },
         contents: [{ parts: [{ text: userPrompt }] }],
         generationConfig: {
-          temperature,
+          temperature: 0.1,
           maxOutputTokens: 8192,
         },
       }),
@@ -353,94 +276,6 @@ async function callGemini(apiKey: string, systemPrompt: string, userPrompt: stri
 
   const data = await res.json();
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-}
-
-const SELF_REVIEW_PROMPT = `You are a security-focused Compact language code auditor for the Midnight blockchain. This code will verify game integrity in production ZK circuits. Incomplete or bypassed checks mean cheaters win. Be ruthless.
-
-${COMPACT_REFERENCE}
-
-Given the ORIGINAL RULES and the GENERATED CODE, perform a 5-part audit:
-
-1. RULE COVERAGE (critical):
-   - For EACH original rule, identify the exact lines of code that enforce it
-   - A rule enforced only by a comment is NOT implemented — flag as missing
-   - A rule checked only partially (e.g. checking X axis but not Y axis for a position bound) is INCOMPLETE — flag it
-
-2. EDGE CASE AUDIT (critical — think like an attacker trying to bypass EACH check):
-   For every constraint in the code, systematically check:
-   - ARITHMETIC: Is EVERY subtraction guarded with >= ternary? (unguarded = circuit panic = DoS). Are multiplications cast with \`as Uint<64>\`? Any division by zero possible?
-   - BOUNDS: Does EVERY numeric/spatial check cover BOTH min AND max? Are ALL dimensions/fields checked independently?
-   - PREVIOUS STATE: If comparing before/after, is the "before" state also validated? (attacker can fake starting state)
-   - COLLECTIONS: Does every membership/search scan ALL elements (fold over entire vector), not just first/last?
-   - TRUST: Does ANY check rely on a witness-provided boolean or pre-computed result instead of recomputing in the circuit?
-   - TEMPORAL: Are ordering constraints enforced with assert(), not just assumed?
-   - AGGREGATION: Are totals/counts independently computed via fold, or do they trust witness-provided sums?
-   - CONSERVATION: If a rule implies something is conserved (balance, total supply), is before == after actually checked?
-   - INPUT SANITY: Are there assert() guards on witness inputs for sane ranges, non-zero, valid enum values?
-   - CROSS-RULE: Do rules that share data use the same witness? Are dependencies between rules enforced in the right order?
-
-3. CORRECTNESS:
-   - disclose() on ALL witness-derived values before ledger writes or public branches
-   - return on ALL code paths in every circuit
-   - fold() accumulator type annotation
-   - Constructor initializes all non-Counter ledger fields
-   - No recursive structs
-
-4. CODE QUALITY:
-   - NO placeholder comments (TODO, implement, stub, add here)
-   - NO commented-out code
-   - Comment-to-code ratio must be < 25%
-   - Every assert() must have a descriptive error string
-   - Variable names must be meaningful and domain-specific
-
-5. STRUCTURAL COMPLETENESS:
-   - pragma 0.22, import CompactStandardLibrary
-   - Verdict enum, ledger with counters, witnesses (separate per input group), exported circuits, constructor
-
-SCORING:
-- 10: Every rule fully implemented with edge cases covered, no issues
-- 8-9: All rules implemented, minor edge cases or warnings only
-- 5-7: Most rules implemented but missing edge cases or has errors
-- 1-4: Rules missing, serious correctness issues, or mostly comments
-
-OUTPUT — respond with ONLY a JSON object (no markdown fences, no other text):
-{
-  "passed": true/false,
-  "issues": [
-    {"severity": "error"|"warning", "description": "specific problem and exact fix needed", "line": number_or_null}
-  ],
-  "missingRules": ["exact rule text from original input that has no real implementation"],
-  "edgeCaseGaps": ["specific edge case not handled, e.g. 'previous Y position not bounds-checked'"],
-  "score": 1-10
-}
-
-Set passed = true ONLY if score >= 8 AND zero errors AND zero missingRules AND zero critical edgeCaseGaps.`;
-
-interface ReviewResult {
-  passed: boolean;
-  issues: { severity: string; description: string; line?: number }[];
-  missingRules: string[];
-  edgeCaseGaps: string[];
-  score: number;
-}
-
-async function selfReview(apiKey: string, originalRules: string, code: string): Promise<ReviewResult> {
-  const prompt = `ORIGINAL RULES:\n${originalRules}\n\nGENERATED COMPACT CODE:\n\`\`\`\n${code}\n\`\`\`\n\nAudit this code thoroughly. Think like an attacker trying to bypass each check. Output ONLY the JSON object.`;
-
-  const raw = await callGemini(apiKey, SELF_REVIEW_PROMPT, prompt, 0.05);
-  const cleaned = raw.replace(/^```\w*\n?/gm, "").replace(/```$/gm, "").trim();
-  try {
-    const parsed = JSON.parse(cleaned);
-    return {
-      passed: parsed.passed ?? false,
-      issues: parsed.issues ?? [],
-      missingRules: parsed.missingRules ?? [],
-      edgeCaseGaps: parsed.edgeCaseGaps ?? [],
-      score: parsed.score ?? 0,
-    };
-  } catch {
-    return { passed: false, issues: [{ severity: "error", description: "Self-review returned invalid output" }], missingRules: [], edgeCaseGaps: [], score: 0 };
-  }
 }
 
 export async function POST(req: NextRequest) {
@@ -464,97 +299,38 @@ export async function POST(req: NextRequest) {
   try {
     let currentCode = "";
     let lastValidation = { valid: false, errors: [] as any[] };
-    let lastReview: ReviewResult | null = null;
-    let iteration = 0;
+    let attempt = 0;
 
-    while (iteration < MAX_ITERATIONS) {
-      // --- PHASE 1: Generate / Refine ---
-      let userPrompt: string;
-
-      if (iteration === 0) {
-        // Initial generation
-        userPrompt = `Translate EVERY one of these rules into a COMPLETE, FULLY IMPLEMENTED Compact ZK circuit contract for production use on the Midnight blockchain.
-
-PROCESS — follow this for each rule:
-1. Classify the constraint type (comparison, range, ordering, membership, uniqueness, rate, conservation, integrity, state transition, dependency, exclusion, accumulation, proportional)
-2. Identify all required private inputs → create witness functions with appropriate types
-3. Write the actual verification logic using assert(), if/else, fold(), persistentHash/persistentCommit
-4. Add edge case guards: underflow-safe subtraction, both-sided bounds, full collection scans, zero guards, overflow casts, sanity checks on witness inputs
-5. Check cross-rule interactions — shared data, dependencies, contradictions
-
-HARD REQUIREMENTS:
-- Each rule → real executable Compact code. NOT a comment. NOT a placeholder.
-- 50+ lines of real logic minimum
-- Every assert() has a descriptive error message
-- Every Uint subtraction guarded with >= ternary
-- Every arithmetic cast with \`as Uint<64>\`
-- Witnesses are UNTRUSTED — validate inputs before using them
-- Never trust a witness boolean — recompute the check in the circuit
-- Separate witness per logical input group
-
-Rules:\n${rules}`;
-      } else {
-        // Build feedback from BOTH static validation AND AI self-review
-        const feedbackParts: string[] = [];
-
-        if (lastValidation.errors.length > 0) {
-          const staticErrors = lastValidation.errors
-            .filter((e: any) => e.severity === "error")
-            .map((e: any) => `[STATIC] Line ${e.line}: ${e.message}`);
-          if (staticErrors.length > 0) {
-            feedbackParts.push(`Static validation errors:\n${staticErrors.join("\n")}`);
-          }
-        }
-
-        if (lastReview && !lastReview.passed) {
-          const reviewErrors = lastReview.issues
-            .filter(i => i.severity === "error")
-            .map(i => `[REVIEW] ${i.line ? `Line ${i.line}: ` : ""}${i.description}`);
-          if (reviewErrors.length > 0) {
-            feedbackParts.push(`AI review errors:\n${reviewErrors.join("\n")}`);
-          }
-          if (lastReview.missingRules.length > 0) {
-            feedbackParts.push(`Rules NOT implemented (must add real code for these):\n${lastReview.missingRules.map(r => `- "${r}"`).join("\n")}`);
-          }
-          if (lastReview.edgeCaseGaps.length > 0) {
-            feedbackParts.push(`EDGE CASES NOT HANDLED (a cheater could exploit these — you MUST add guards):\n${lastReview.edgeCaseGaps.map(g => `- ${g}`).join("\n")}`);
-          }
-          feedbackParts.push(`Security audit score: ${lastReview.score}/10`);
-        }
-
-        userPrompt = `Your previous Compact code needs improvement.\n\n${feedbackParts.join("\n\n")}\n\nOriginal rules:\n${rules}\n\nPrevious code:\n${currentCode}\n\nFix ALL issues. Implement ALL missing rules as real executable code. Do NOT use comments as placeholders. Do NOT remove working code. Output ONLY the improved Compact code.`;
-      }
+    while (attempt <= MAX_RETRIES) {
+      const userPrompt =
+        attempt === 0
+          ? `Translate EVERY one of these game rules into a COMPLETE, FULLY IMPLEMENTED Compact ZK circuit contract. Each rule must become real executable Compact code — not a comment, not a placeholder, not a TODO. Use assert() for hard checks, if/else for verdict logic, fold() for aggregations over vectors, and persistentHash() for commitment verification. Define separate witness functions for each logical input group. The contract must be production-quality with 30+ lines of real logic.\n\nRules:\n${rules}`
+          : `Your previous Compact code had these validation errors:\n${lastValidation.errors
+              .filter((e: any) => e.severity === "error")
+              .map((e: any) => `Line ${e.line}: ${e.message}`)
+              .join("\n")}\n\nHere is the code to fix:\n\n${currentCode}\n\nFix the errors while keeping ALL rule implementations complete. Do NOT replace working code with comments. Output ONLY the corrected Compact code.`;
 
       const raw = await callGemini(apiKey, SYSTEM_PROMPT, userPrompt);
       currentCode = stripMarkdown(raw);
-
-      // --- PHASE 2: Static validation ---
       lastValidation = validateCompact(currentCode);
-      const staticPassed = lastValidation.valid || lastValidation.errors.every((e: any) => e.severity === "warning");
 
-      // --- PHASE 3: AI self-review ---
-      lastReview = await selfReview(apiKey, rules, currentCode);
-
-      // If both static AND self-review pass, we're done
-      if (staticPassed && lastReview.passed) {
+      if (lastValidation.valid || lastValidation.errors.every((e: any) => e.severity === "warning")) {
         return NextResponse.json({
           compact: currentCode,
           validation: lastValidation.errors,
-          review: { score: lastReview.score, issues: lastReview.issues },
-          attempts: iteration + 1,
+          attempts: attempt + 1,
           needsHumanReview: false,
         });
       }
 
-      iteration++;
+      attempt++;
     }
 
-    // After max iterations, return best effort with all feedback
+    // After max retries, return code WITH errors for human fix
     return NextResponse.json({
       compact: currentCode,
       validation: lastValidation.errors,
-      review: lastReview ? { score: lastReview.score, issues: lastReview.issues, missingRules: lastReview.missingRules, edgeCaseGaps: lastReview.edgeCaseGaps } : null,
-      attempts: iteration,
+      attempts: attempt,
       needsHumanReview: true,
     });
   } catch (e: any) {
