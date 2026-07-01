@@ -35,6 +35,7 @@ function computeBadges(totalChecks: number, totalFlagged: number, cleanRate: num
 export default function PassportPage() {
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [connectStatus, setConnectStatus] = useState("");
   const [passport, setPassport] = useState<PassportData | null>(null);
   const [showProof, setShowProof] = useState(false);
   const [walletConnection, setWalletConnection] = useState<MidnightConnection | null>(null);
@@ -68,16 +69,18 @@ export default function PassportPage() {
     }
 
     setConnecting(true);
+    setConnectStatus("Connecting wallet...");
     try {
       console.log("[passport] Connecting wallet to standalone...");
       const conn = await connectWallet("standalone");
       console.log("[passport] Wallet connected:", conn);
 
+      setConnectStatus("Deploying contract (ZK proof generation ~1-2 min)...");
       console.log("[passport] Deploying contract...");
       const contractAddr = await deployContract();
       console.log("[passport] Contract deployed at:", contractAddr);
 
-      // Sync ledger from chain
+      setConnectStatus("Syncing ledger...");
       console.log("[passport] Syncing ledger from chain...");
       await syncLedgerFromChain();
 
@@ -142,7 +145,7 @@ export default function PassportPage() {
               : "bg-cyan-600 hover:bg-cyan-500 text-white"
           } ${connecting ? "opacity-50 cursor-wait" : ""}`}
         >
-          {connecting ? "Connecting..." : connected ? "Disconnect Wallet" : "Connect Wallet"}
+          {connecting ? (connectStatus || "Connecting...") : connected ? "Disconnect Wallet" : "Connect Wallet"}
         </button>
         {connected && conn.walletAddress && (
           <span className="text-sm text-gray-400 font-mono">{conn.walletAddress}</span>
