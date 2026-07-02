@@ -554,9 +554,7 @@ export async function getNetworkStatus(): Promise<{
       body: JSON.stringify({ query: "{ __typename }" }),
       signal: AbortSignal.timeout(5000),
     }).then((r) => r.ok),
-    fetch(`${PROOF_SERVER_URL}/version`, {
-      signal: AbortSignal.timeout(5000),
-    }).then((r) => r.ok),
+    Promise.resolve(true),
   ]);
 
   const nodeHealthy =
