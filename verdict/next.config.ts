@@ -2,16 +2,14 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    turbo: {
-      resolveAlias: {
-        "@midnight-ntwrk/verdict-contract": path.resolve(
-          __dirname,
-          "..",
-          "contract",
-          "dist"
-        ),
-      },
+  turbopack: {
+    resolveAlias: {
+      "@midnight-ntwrk/verdict-contract": path.resolve(
+        __dirname,
+        "..",
+        "contract",
+        "dist"
+      ),
     },
   },
   typescript: {
