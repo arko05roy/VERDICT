@@ -1,4 +1,4 @@
-# Integration Guide — Adding VERDICT to Your Game
+# Integration Guide — Adding VERDICT to Your System
 
 ## Prerequisites
 
@@ -9,9 +9,9 @@
 ## Architecture Overview
 
 ```
-Your Game Client
+Your System (any rule-based application)
     │
-    ├─ Captures state transitions (position, action, aim, tick)
+    ├─ Captures state transitions (state, action, timing)
     │
     ├─ Locally batches transitions
     │
@@ -24,11 +24,11 @@ Your Game Client
                     └─ Returns: CLEAN (0) or FLAGGED (1)
 ```
 
-Your game runs normally. VERDICT operates in the background — no latency, no pausing, no kernel access.
+Your system runs normally. VERDICT operates in the background — no latency, no pausing, no kernel access.
 
 ## Step 1: Define Your Ruleset
 
-A ruleset is the set of parameters that configure VERDICT's 10 checks for your specific game. You pass these as public inputs to the `verifyTransition` circuit.
+A ruleset is the set of Guardians and parameters that define "valid" for your system. You compose this using VCL (Verdict Compile Language), which deterministically compiles to a Compact ZK circuit. The public parameters are passed to the `verifyTransition` circuit.
 
 | Parameter | Type | Description | Example |
 |-----------|------|-------------|---------|
@@ -151,7 +151,7 @@ After verification, the ledger is updated with the results:
 }
 ```
 
-Games can read this ledger state to decide what to do with flagged players — kick, ban, reduce matchmaking rating, or flag for review.
+Systems can read this ledger state to decide what to do with flagged actors — restrict access, escalate for review, adjust trust scores, or trigger automated responses.
 
 ## Running Locally
 

@@ -5,10 +5,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 
 const NAV = [
-  { href: "/overview", label: "Overview", icon: "◆" },
-  { href: "/deploy", label: "Deploy", icon: "▶" },
-  { href: "/explore", label: "Explore", icon: "◎" },
-  { href: "/integrate", label: "Integrate", icon: "⟐" },
+  { href: "/overview", label: "Overview", icon: "\u25C6" },
+  { href: "/deploy", label: "Deploy", icon: "\u25B6" },
+  { href: "/explore", label: "Explore", icon: "\u25CE" },
+  { href: "/dao", label: "Governance", icon: "\u2696" },
+  { href: "/integrate", label: "Integrate", icon: "\u27D0" },
 ];
 
 interface NetworkStatus {

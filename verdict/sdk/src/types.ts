@@ -3,21 +3,27 @@ export type VerdictOutcome = "CLEAN" | "FLAGGED";
 
 /** Individual check result from the ZK circuit */
 export interface CheckDetail {
-  /** Name of the integrity check (e.g., "velocity_check", "bounds_check") */
+  /** Check identifier (e.g., "hermes", "terminus") */
+  id: string;
+  /** Mythological name of the guardian (e.g., "Hermes", "Terminus") */
   name: string;
+  /** Numeral (e.g., "III", "V") */
+  numeral: string;
+  /** Check category */
+  category: string;
   /** Whether this check passed */
   passed: boolean;
 }
 
 /** Input for a state transition verification */
 export interface VerifyInput {
-  /** Previous game state (positions, inventories, etc.) */
+  /** Previous system state */
   prevState: unknown;
-  /** Current game state after the transition */
+  /** Current system state after the transition */
   currState: unknown;
   /** The action that caused the transition */
   action: unknown;
-  /** Optional player identifier */
+  /** Optional actor identifier */
   player?: string;
   /** Optional session identifier */
   session?: string;
@@ -53,10 +59,14 @@ export interface RulesetInfo {
   address: string;
   /** Human-readable name */
   name: string;
-  /** Game category (fps, card-game, mmorpg, etc.) */
-  category: string;
   /** Description of what this ruleset enforces */
   description: string;
+  /** Freeform tags */
+  tags: string[];
+  /** IDs of enabled guardian checks */
+  enabledChecks: string[];
+  /** Number of active guardians */
+  checkCount: number;
   /** ISO timestamp of deployment */
   deployedAt: string;
   /** Total number of verifications run */

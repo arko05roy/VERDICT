@@ -7,22 +7,16 @@ import { useParams } from "next/navigation";
 type Ruleset = {
   address: string;
   name: string;
-  category: string;
   description: string;
+  tags: string[];
+  enabledChecks: string[];
+  checkCount: number;
   deployedAt: string;
   compact: string;
   totalChecks: number;
   totalFlagged: number;
   flaggedRate: string;
-};
-
-const CATEGORY_SYMBOLS: Record<string, string> = {
-  fps: "⊕",
-  "card-game": "♠",
-  mmorpg: "⚔",
-  "turn-based": "♟",
-  casino: "♦",
-  "battle-royale": "◎",
+  category?: string;
 };
 
 export default function RulesetDetailPage() {
@@ -95,7 +89,7 @@ export default function RulesetDetailPage() {
     );
   }
 
-  const sym = CATEGORY_SYMBOLS[ruleset.category] || "◈";
+  const checkCount = ruleset.checkCount || 10;
   const flaggedRate =
     ruleset.totalChecks > 0
       ? ((ruleset.totalFlagged / ruleset.totalChecks) * 100).toFixed(2)
@@ -185,13 +179,13 @@ if (proof.flagged) {
               <div className="absolute bottom-[6px] left-[6px] text-[5px] text-[#2a2a2a] rotate-180">◆</div>
               <div className="absolute bottom-[6px] right-[6px] text-[5px] text-[#2a2a2a] rotate-180">◆</div>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-5xl text-[#555] mb-2">{sym}</span>
+                <span className="text-5xl text-[#555] mb-2">{"\u25C7"}</span>
                 <div className="flex items-center gap-1.5 opacity-40">
                   <div className="w-4 h-px bg-[#444]" />
                   <span className="text-[5px] text-[#444]">✦</span>
                   <div className="w-4 h-px bg-[#444]" />
                 </div>
-                <span className="text-[7px] uppercase tracking-[0.2em] text-[#444] mt-1">{ruleset.category}</span>
+                <span className="text-[7px] uppercase tracking-[0.2em] text-[#444] mt-1">{checkCount} guardians</span>
               </div>
             </div>
 
@@ -215,7 +209,7 @@ if (proof.flagged) {
               {/* Meta row */}
               <div className="flex items-center gap-4 flex-wrap">
                 <span className="text-[9px] uppercase tracking-[0.15em] text-[var(--accent)] border border-[var(--accent)] px-2.5 py-1 font-bold">
-                  {sym} {ruleset.category}
+                  {"\u25C7"} {checkCount} guardians
                 </span>
                 <span className="text-[9px] text-[#555] font-mono">
                   {ruleset.address}
@@ -464,7 +458,7 @@ if (proof.flagged) {
               const config = {
                 name: ruleset.name,
                 address: ruleset.address,
-                category: ruleset.category,
+                tags: ruleset.tags,
                 description: ruleset.description,
                 deployedAt: ruleset.deployedAt,
                 compact: ruleset.compact,
@@ -640,7 +634,7 @@ if (proof.flagged) {
                   { label: "Contract Address", value: ruleset.address },
                   { label: "Network", value: "midnight-local (simulator)" },
                   { label: "Deployed At", value: new Date(ruleset.deployedAt).toLocaleString() },
-                  { label: "Category", value: ruleset.category },
+                  { label: "Guardians", value: `${checkCount}` },
                   { label: "Total Checks", value: String(ruleset.totalChecks) },
                   { label: "Total Flagged", value: String(ruleset.totalFlagged) },
                   { label: "Flagged Rate", value: `${flaggedRate}%` },

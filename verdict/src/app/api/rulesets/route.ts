@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDeployedRulesets, getContractState } from "../../../lib/midnight";
+import { getDeployedRulesets, getContractState } from "@/lib/midnight";
 
 export async function GET() {
   try {
@@ -23,7 +23,14 @@ export async function GET() {
             : "0.00";
 
         return {
-          ...rs,
+          address: rs.address,
+          name: rs.name,
+          description: rs.description,
+          tags: rs.tags || [],
+          enabledChecks: rs.enabledChecks || [],
+          checkCount: rs.checkCount || 10,
+          deployedAt: rs.deployedAt,
+          txHash: rs.txHash,
           totalChecks,
           totalFlagged,
           flaggedRate: `${flaggedRate}%`,

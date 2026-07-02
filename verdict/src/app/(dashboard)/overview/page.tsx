@@ -30,22 +30,16 @@ type NetworkStatus = {
 type Ruleset = {
   address: string;
   name: string;
-  category: string;
   description: string;
+  tags: string[];
+  enabledChecks: string[];
+  checkCount: number;
   deployedAt: string;
   totalChecks: number;
   totalFlagged: number;
   flaggedRate: string;
   status: string;
-};
-
-const CATEGORY_SYMBOLS: Record<string, string> = {
-  fps: "⊕",
-  "card-game": "♠",
-  mmorpg: "⚔",
-  "turn-based": "♟",
-  casino: "♦",
-  "battle-royale": "◎",
+  category?: string;
 };
 
 export default function OverviewPage() {
@@ -393,7 +387,6 @@ export default function OverviewPage() {
                 </div>
               ) : (
                 rulesets.slice(0, 5).map((rs, idx) => {
-                  const sym = CATEGORY_SYMBOLS[rs.category] || "◈";
                   const numerals = ["V", "VI", "VII", "VIII", "IX"];
 
                   return (
@@ -409,7 +402,7 @@ export default function OverviewPage() {
                           <div className="absolute inset-[2px] border border-[var(--border)] group-hover:border-[var(--border-bright)] transition-colors" />
                           <div className="absolute inset-0 flex flex-col items-center justify-center">
                             <span className="text-[5px] tracking-[0.2em] text-[var(--text-muted)] mb-0.5">{numerals[idx]}</span>
-                            <span className="text-sm text-[var(--border-bright)] group-hover:text-[var(--accent)] transition-colors">{sym}</span>
+                            <span className="text-sm text-[var(--border-bright)] group-hover:text-[var(--accent)] transition-colors">{"\u25C7"}</span>
                           </div>
                         </div>
 
@@ -421,7 +414,7 @@ export default function OverviewPage() {
                           </div>
                           <div className="flex items-center gap-2 mb-1.5">
                             <span className="text-[8px] uppercase tracking-[0.15em] text-[var(--text-muted)] border border-[var(--border)] px-1.5 py-0.5 group-hover:border-[var(--border-bright)] transition-colors">
-                              {rs.category}
+                              {rs.checkCount || 10} guardians
                             </span>
                             <span className="text-[8px] text-[var(--text-muted)] font-mono">
                               {rs.address.slice(0, 8)}...{rs.address.slice(-4)}

@@ -5,8 +5,10 @@ import { useState, useEffect, useMemo, useRef } from "react";
 type Ruleset = {
   address: string;
   name: string;
-  category: string;
   description: string;
+  tags?: string[];
+  checkCount?: number;
+  category?: string;
 };
 
 const LANGUAGES = ["TypeScript", "Python", "Rust", "Go"] as const;
@@ -19,14 +21,6 @@ const LANG_ICONS: Record<Lang, string> = {
   Go: "GO",
 };
 
-const CATEGORY_SYMBOLS: Record<string, string> = {
-  fps: "⊕",
-  "card-game": "♠",
-  mmorpg: "⚔",
-  "turn-based": "♟",
-  casino: "♦",
-  "battle-royale": "◎",
-};
 
 function getSnippet(lang: Lang, address: string): string {
   const addr = address || "<RULESET_ADDRESS>";
@@ -38,8 +32,8 @@ const verdict = new Verdict("${addr}");
 
 // Submit a state transition for verification
 const proof = await verdict.verify({
-  prevState: gameState.previous,
-  currState: gameState.current,
+  prevState: state.previous,
+  currState: state.current,
   action: playerAction,
 });
 
@@ -53,8 +47,8 @@ verdict = Verdict("${addr}")
 
 # Submit a state transition for verification
 proof = await verdict.verify(
-    prev_state=game_state.previous,
-    curr_state=game_state.current,
+    prev_state=state.previous,
+    curr_state=state.current,
     action=player_action,
 )
 
@@ -68,8 +62,8 @@ let verdict = Verdict::new("${addr}");
 
 // Submit a state transition for verification
 let proof = verdict.verify(VerifyInput {
-    prev_state: game_state.previous,
-    curr_state: game_state.current,
+    prev_state: state.previous,
+    curr_state: state.current,
     action: player_action,
 }).await?;
 
@@ -83,8 +77,8 @@ v := verdict.New("${addr}")
 
 // Submit a state transition for verification
 proof, err := v.Verify(verdict.VerifyInput{
-    PrevState: gameState.Previous,
-    CurrState: gameState.Current,
+    PrevState: state.Previous,
+    CurrState: state.Current,
     Action:    playerAction,
 })
 
@@ -142,7 +136,7 @@ export default function IntegratePage() {
     return rulesets.filter(
       (r) =>
         r.name.toLowerCase().includes(q) ||
-        r.category.toLowerCase().includes(q) ||
+        (r.tags || []).some((t: string) => t.toLowerCase().includes(q)) ||
         r.address.toLowerCase().includes(q)
     );
   }, [input, rulesets]);
@@ -175,7 +169,7 @@ export default function IntegratePage() {
   }
 
   const HOW_IT_WORKS = [
-    { numeral: "I", title: "Capture", desc: "Game client captures state transition — position, action, timing", symbol: "⊕" },
+    { numeral: "I", title: "Capture", desc: "Client captures state transition \u2014 position, action, timing", symbol: "\u2295" },
     { numeral: "II", title: "Submit", desc: "SDK submits transition to VERDICT as a ZK witness (private)", symbol: "◈" },
     { numeral: "III", title: "Prove", desc: "Circuit runs 10 integrity checks inside zero-knowledge proof", symbol: "⚑" },
     { numeral: "IV", title: "Settle", desc: "Proof settles on Midnight — returns CLEAN or FLAGGED", symbol: "✦" },
@@ -194,7 +188,7 @@ export default function IntegratePage() {
           Integrate
         </h1>
         <p className="text-[11px] text-[var(--text-muted)] mt-2 tracking-wide">
-          Bind any game or application to a deployed ruleset. Two lines of code.
+          Bind any system to a deployed ruleset. Two lines of code.
         </p>
       </div>
 
@@ -266,12 +260,12 @@ export default function IntegratePage() {
 
             <div className="relative px-5 py-3 flex items-center gap-4">
               <span className="w-2 h-2 bg-[var(--accent)] live-dot shrink-0" />
-              <span className="text-lg text-[#333]">{CATEGORY_SYMBOLS[selectedRuleset.category] || "◈"}</span>
+              <span className="text-lg text-[#333]">{"\u25C7"}</span>
               <div className="flex-1 min-w-0">
                 <span className="text-[12px] text-white font-bold uppercase tracking-[0.1em] block truncate">{selectedRuleset.name}</span>
                 <span className="text-[9px] text-[#444] font-mono">{selectedRuleset.address}</span>
               </div>
-              <span className="text-[8px] uppercase tracking-[0.2em] text-[var(--accent)] border border-[var(--accent)] px-2 py-0.5 shrink-0">{selectedRuleset.category}</span>
+              <span className="text-[8px] uppercase tracking-[0.2em] text-[var(--accent)] border border-[var(--accent)] px-2 py-0.5 shrink-0">{selectedRuleset.checkCount || 10} guardians</span>
               <button
                 onClick={() => { setSelectedAddress(""); setInput(""); }}
                 className="text-[9px] text-[#333] hover:text-white transition-colors cursor-pointer border border-[#1e1e1e] hover:border-[#444] px-2 py-1 uppercase tracking-[0.15em]"
@@ -541,7 +535,6 @@ export default function IntegratePage() {
                   </div>
                 ) : (
                   filtered.map((r) => {
-                    const sym = CATEGORY_SYMBOLS[r.category] || "◈";
                     return (
                       <button
                         key={r.address}
@@ -552,12 +545,12 @@ export default function IntegratePage() {
                         onMouseEnter={(e) => (e.currentTarget.style.borderLeftColor = "var(--accent)")}
                         onMouseLeave={(e) => (e.currentTarget.style.borderLeftColor = "transparent")}
                       >
-                        <span className="text-lg text-[#333] group-hover:text-[var(--accent)] transition-colors duration-300 w-5 text-center shrink-0">{sym}</span>
+                        <span className="text-lg text-[#333] group-hover:text-[var(--accent)] transition-colors duration-300 w-5 text-center shrink-0">{"\u25C7"}</span>
                         <div className="flex-1 min-w-0">
                           <span className="text-[11px] text-[#aaa] font-bold uppercase tracking-[0.1em] group-hover:text-white transition-colors block truncate">{r.name}</span>
-                          <span className="text-[8px] text-[#333] font-mono">{r.address.slice(0, 10)}…{r.address.slice(-4)}</span>
+                          <span className="text-[8px] text-[#333] font-mono">{r.address.slice(0, 10)}\u2026{r.address.slice(-4)}</span>
                         </div>
-                        <span className="text-[7px] uppercase tracking-[0.2em] text-[#333] border border-[#1a1a1a] px-2 py-0.5 shrink-0 group-hover:border-[#333] group-hover:text-[#555] transition-colors">{r.category}</span>
+                        <span className="text-[7px] uppercase tracking-[0.2em] text-[#333] border border-[#1a1a1a] px-2 py-0.5 shrink-0 group-hover:border-[#333] group-hover:text-[#555] transition-colors">{r.checkCount || 10}g</span>
                       </button>
                     );
                   })

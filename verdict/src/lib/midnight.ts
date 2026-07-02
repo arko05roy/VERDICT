@@ -88,11 +88,16 @@ setNetworkId("undeployed");
 export interface DeployedRuleset {
   address: string;
   name: string;
-  category: string;
   description: string;
+  tags: string[];
+  enabledChecks: string[];
+  checkCount: number;
+  vcl: string;
   deployedAt: string;
   txHash: string;
   compact: string;
+  // Legacy field — kept for backward compat with v1 store entries
+  category?: string;
 }
 
 type VerdictCircuits = ImpureCircuitId<Verdict.Contract<VerdictPrivateState>>;
@@ -121,11 +126,29 @@ interface RulesetEntry {
 
 const STORE_PATH = path.resolve(process.cwd(), ".verdict-store.json");
 
+function migrateV1Entry(rs: any): DeployedRuleset {
+  // v1 entries have `category` but no `enabledChecks`
+  if (rs.enabledChecks) return rs;
+  return {
+    ...rs,
+    tags: rs.category ? [rs.category] : [],
+    enabledChecks: [
+      "mnemosyne", "styx", "hermes", "phaethon", "terminus",
+      "themis", "chronos", "moirai", "daedalus", "prometheus",
+    ],
+    checkCount: 10,
+    vcl: "",
+  };
+}
+
 function loadStore(): RulesetEntry[] {
   try {
     if (fs.existsSync(STORE_PATH)) {
       const raw = fs.readFileSync(STORE_PATH, "utf-8");
-      return JSON.parse(raw);
+      const entries: RulesetEntry[] = JSON.parse(raw);
+      return entries.map((e) => ({
+        ruleset: migrateV1Entry(e.ruleset),
+      }));
     }
   } catch (err) {
     console.error("[midnight] Failed to load store:", err);
@@ -437,8 +460,11 @@ export async function ensureInitialized() {
 
 export async function deployVerdictContract(meta: {
   name: string;
-  category: string;
   description: string;
+  tags: string[];
+  enabledChecks: string[];
+  checkCount: number;
+  vcl: string;
   compact: string;
 }): Promise<DeployedRuleset> {
   const { providers } = await ensureInitialized();
@@ -458,8 +484,11 @@ export async function deployVerdictContract(meta: {
   const ruleset: DeployedRuleset = {
     address: contractAddress,
     name: meta.name,
-    category: meta.category,
     description: meta.description,
+    tags: meta.tags,
+    enabledChecks: meta.enabledChecks,
+    checkCount: meta.checkCount,
+    vcl: meta.vcl,
     deployedAt: new Date().toISOString(),
     txHash: typeof txHash === "string" ? txHash : contractAddress,
     compact: meta.compact,
