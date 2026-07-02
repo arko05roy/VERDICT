@@ -1,5 +1,5 @@
 import * as __compactRuntime from '@midnight-ntwrk/compact-runtime';
-__compactRuntime.checkRuntimeVersion('0.14.0');
+__compactRuntime.checkRuntimeVersion('0.15.0');
 
 const _descriptor_0 = new __compactRuntime.CompactTypeUnsignedInteger(65535n, 2);
 
@@ -314,6 +314,11 @@ export class Contract {
       }
     };
     this.impureCircuits = {
+      startSession: this.circuits.startSession,
+      commitMove: this.circuits.commitMove,
+      verifyTransition: this.circuits.verifyTransition
+    };
+    this.provableCircuits = {
       startSession: this.circuits.startSession,
       commitMove: this.circuits.commitMove,
       verifyTransition: this.circuits.verifyTransition
@@ -802,42 +807,67 @@ export class Contract {
     const check4Fail_0 = this._equal_2(isFirst_0, 0n) ?
                          accel_0 > maxAcceleration_0 ? 1n : 0n :
                          0n;
-    const check5Fail_0 = (c_0[0] > boundX_0 ? 1n : 0n)
+    let t_0, t_1;
+    const check5Fail_0 = ((t_0 = c_0[0], t_0 > boundX_0) ? 1n : 0n)
                          +
-                         (c_0[1] > boundY_0 ? 1n : 0n);
+                         ((t_1 = c_0[1], t_1 > boundY_0) ? 1n : 0n);
     const check6Fail_0 = action_0 >= validActionCount_0 ? 1n : 0n;
-    __compactRuntime.assert(tickHist_0[0] <= tickHist_0[1],
+    let t_2;
+    __compactRuntime.assert((t_2 = tickHist_0[0], t_2 <= tickHist_0[1]),
                             'Tick history not monotonic');
-    __compactRuntime.assert(tickHist_0[1] <= tickHist_0[2],
+    let t_3;
+    __compactRuntime.assert((t_3 = tickHist_0[1], t_3 <= tickHist_0[2]),
                             'Tick history not monotonic');
-    __compactRuntime.assert(tickHist_0[2] <= tickHist_0[3],
+    let t_4;
+    __compactRuntime.assert((t_4 = tickHist_0[2], t_4 <= tickHist_0[3]),
                             'Tick history not monotonic');
-    __compactRuntime.assert(tickHist_0[3] <= tickHist_0[4],
+    let t_5;
+    __compactRuntime.assert((t_5 = tickHist_0[3], t_5 <= tickHist_0[4]),
                             'Tick history not monotonic');
-    __compactRuntime.assert(tickHist_0[4] <= tickHist_0[5],
+    let t_6;
+    __compactRuntime.assert((t_6 = tickHist_0[4], t_6 <= tickHist_0[5]),
                             'Tick history not monotonic');
-    __compactRuntime.assert(tickHist_0[5] <= tickHist_0[6],
+    let t_7;
+    __compactRuntime.assert((t_7 = tickHist_0[5], t_7 <= tickHist_0[6]),
                             'Tick history not monotonic');
-    __compactRuntime.assert(tickHist_0[6] <= tickHist_0[7],
+    let t_8;
+    __compactRuntime.assert((t_8 = tickHist_0[6], t_8 <= tickHist_0[7]),
                             'Tick history not monotonic');
     const windowStart_0 = (__compactRuntime.assert(now_0 >= windowSize_0,
                                                    'result of subtraction would be negative'),
                            now_0 - windowSize_0);
-    const actionsInWindow_0 = (tickHist_0[0] >= windowStart_0 ? 1n : 0n)
+    let t_15, t_16, t_13, t_14, t_11, t_12, t_9, t_10;
+    const actionsInWindow_0 = ((t_15 = tickHist_0[0], t_15 >= windowStart_0) ?
+                               1n :
+                               0n)
                               +
-                              (tickHist_0[1] >= windowStart_0 ? 1n : 0n)
+                              ((t_16 = tickHist_0[1], t_16 >= windowStart_0) ?
+                               1n :
+                               0n)
                               +
-                              (tickHist_0[2] >= windowStart_0 ? 1n : 0n)
+                              ((t_13 = tickHist_0[2], t_13 >= windowStart_0) ?
+                               1n :
+                               0n)
                               +
-                              (tickHist_0[3] >= windowStart_0 ? 1n : 0n)
+                              ((t_14 = tickHist_0[3], t_14 >= windowStart_0) ?
+                               1n :
+                               0n)
                               +
-                              (tickHist_0[4] >= windowStart_0 ? 1n : 0n)
+                              ((t_11 = tickHist_0[4], t_11 >= windowStart_0) ?
+                               1n :
+                               0n)
                               +
-                              (tickHist_0[5] >= windowStart_0 ? 1n : 0n)
+                              ((t_12 = tickHist_0[5], t_12 >= windowStart_0) ?
+                               1n :
+                               0n)
                               +
-                              (tickHist_0[6] >= windowStart_0 ? 1n : 0n)
+                              ((t_9 = tickHist_0[6], t_9 >= windowStart_0) ?
+                               1n :
+                               0n)
                               +
-                              (tickHist_0[7] >= windowStart_0 ? 1n : 0n);
+                              ((t_10 = tickHist_0[7], t_10 >= windowStart_0) ?
+                               1n :
+                               0n);
     const check7Fail_0 = actionsInWindow_0 > maxActionsPerWindow_0 ? 1n : 0n;
     const freq0_0 = this._folder_0(context,
                                    partialProofData,
@@ -931,7 +961,8 @@ export class Contract {
                                        }
                                        return t1;
                                      })(d0y_0_0 * d1x_0_0));
-    const snap0_0 = cross0_0 * cross0_0 > threshSq_0 ? 1n : 0n;
+    let t_17;
+    const snap0_0 = (t_17 = cross0_0 * cross0_0, t_17 > threshSq_0) ? 1n : 0n;
     const d0x_1_0 = this._absDiff_0(aimFlat_0[4], aimFlat_0[2]);
     const d0y_1_0 = this._absDiff_0(aimFlat_0[5], aimFlat_0[3]);
     const d1x_1_0 = this._absDiff_0(aimFlat_0[6], aimFlat_0[4]);
@@ -948,7 +979,8 @@ export class Contract {
                                        }
                                        return t1;
                                      })(d0y_1_0 * d1x_1_0));
-    const snap1_0 = cross1_0 * cross1_0 > threshSq_0 ? 1n : 0n;
+    let t_18;
+    const snap1_0 = (t_18 = cross1_0 * cross1_0, t_18 > threshSq_0) ? 1n : 0n;
     const d0x_2_0 = this._absDiff_0(aimFlat_0[6], aimFlat_0[4]);
     const d0y_2_0 = this._absDiff_0(aimFlat_0[7], aimFlat_0[5]);
     const d1x_2_0 = this._absDiff_0(aimFlat_0[8], aimFlat_0[6]);
@@ -965,7 +997,8 @@ export class Contract {
                                        }
                                        return t1;
                                      })(d0y_2_0 * d1x_2_0));
-    const snap2_0 = cross2_0 * cross2_0 > threshSq_0 ? 1n : 0n;
+    let t_19;
+    const snap2_0 = (t_19 = cross2_0 * cross2_0, t_19 > threshSq_0) ? 1n : 0n;
     const d0x_3_0 = this._absDiff_0(aimFlat_0[8], aimFlat_0[6]);
     const d0y_3_0 = this._absDiff_0(aimFlat_0[9], aimFlat_0[7]);
     const d1x_3_0 = this._absDiff_0(aimFlat_0[10], aimFlat_0[8]);
@@ -982,7 +1015,8 @@ export class Contract {
                                        }
                                        return t1;
                                      })(d0y_3_0 * d1x_3_0));
-    const snap3_0 = cross3_0 * cross3_0 > threshSq_0 ? 1n : 0n;
+    let t_20;
+    const snap3_0 = (t_20 = cross3_0 * cross3_0, t_20 > threshSq_0) ? 1n : 0n;
     const d0x_4_0 = this._absDiff_0(aimFlat_0[10], aimFlat_0[8]);
     const d0y_4_0 = this._absDiff_0(aimFlat_0[11], aimFlat_0[9]);
     const d1x_4_0 = this._absDiff_0(aimFlat_0[12], aimFlat_0[10]);
@@ -999,7 +1033,8 @@ export class Contract {
                                        }
                                        return t1;
                                      })(d0y_4_0 * d1x_4_0));
-    const snap4_0 = cross4_0 * cross4_0 > threshSq_0 ? 1n : 0n;
+    let t_21;
+    const snap4_0 = (t_21 = cross4_0 * cross4_0, t_21 > threshSq_0) ? 1n : 0n;
     const d0x_5_0 = this._absDiff_0(aimFlat_0[12], aimFlat_0[10]);
     const d0y_5_0 = this._absDiff_0(aimFlat_0[13], aimFlat_0[11]);
     const d1x_5_0 = this._absDiff_0(aimFlat_0[14], aimFlat_0[12]);
@@ -1016,7 +1051,8 @@ export class Contract {
                                        }
                                        return t1;
                                      })(d0y_5_0 * d1x_5_0));
-    const snap5_0 = cross5_0 * cross5_0 > threshSq_0 ? 1n : 0n;
+    let t_22;
+    const snap5_0 = (t_22 = cross5_0 * cross5_0, t_22 > threshSq_0) ? 1n : 0n;
     const totalSnaps_0 = snap0_0 + snap1_0 + snap2_0 + snap3_0 + snap4_0
                          +
                          snap5_0;
@@ -1025,85 +1061,133 @@ export class Contract {
     __compactRuntime.assert(this._equal_7(recomputedEnemyHash_0,
                                           enemyPosHashPublic_0),
                             'Enemy position hash mismatch');
-    const movingRight_0 = c_0[0] > p_0[0] ? 1n : 0n;
-    const movingUp_0 = c_0[1] > p_0[1] ? 1n : 0n;
+    let t_23; const movingRight_0 = (t_23 = c_0[0], t_23 > p_0[0]) ? 1n : 0n;
+    let t_24; const movingUp_0 = (t_24 = c_0[1], t_24 > p_0[1]) ? 1n : 0n;
+    let t_25;
     const towardX0_0 = this._equal_8(movingRight_0,
-                                     enemyFlat_0[0] > c_0[0] ? 1n : 0n)
+                                     (t_25 = enemyFlat_0[0], t_25 > c_0[0]) ?
+                                     1n :
+                                     0n)
                        ?
                        1n :
                        0n;
+    let t_26;
     const towardY0_0 = this._equal_9(movingUp_0,
-                                     enemyFlat_0[1] > c_0[1] ? 1n : 0n)
+                                     (t_26 = enemyFlat_0[1], t_26 > c_0[1]) ?
+                                     1n :
+                                     0n)
                        ?
                        1n :
                        0n;
+    let t_27;
     const towardX1_0 = this._equal_10(movingRight_0,
-                                      enemyFlat_0[2] > c_0[0] ? 1n : 0n)
+                                      (t_27 = enemyFlat_0[2], t_27 > c_0[0]) ?
+                                      1n :
+                                      0n)
                        ?
                        1n :
                        0n;
+    let t_28;
     const towardY1_0 = this._equal_11(movingUp_0,
-                                      enemyFlat_0[3] > c_0[1] ? 1n : 0n)
+                                      (t_28 = enemyFlat_0[3], t_28 > c_0[1]) ?
+                                      1n :
+                                      0n)
                        ?
                        1n :
                        0n;
+    let t_29;
     const towardX2_0 = this._equal_12(movingRight_0,
-                                      enemyFlat_0[4] > c_0[0] ? 1n : 0n)
+                                      (t_29 = enemyFlat_0[4], t_29 > c_0[0]) ?
+                                      1n :
+                                      0n)
                        ?
                        1n :
                        0n;
+    let t_30;
     const towardY2_0 = this._equal_13(movingUp_0,
-                                      enemyFlat_0[5] > c_0[1] ? 1n : 0n)
+                                      (t_30 = enemyFlat_0[5], t_30 > c_0[1]) ?
+                                      1n :
+                                      0n)
                        ?
                        1n :
                        0n;
+    let t_31;
     const towardX3_0 = this._equal_14(movingRight_0,
-                                      enemyFlat_0[6] > c_0[0] ? 1n : 0n)
+                                      (t_31 = enemyFlat_0[6], t_31 > c_0[0]) ?
+                                      1n :
+                                      0n)
                        ?
                        1n :
                        0n;
+    let t_32;
     const towardY3_0 = this._equal_15(movingUp_0,
-                                      enemyFlat_0[7] > c_0[1] ? 1n : 0n)
+                                      (t_32 = enemyFlat_0[7], t_32 > c_0[1]) ?
+                                      1n :
+                                      0n)
                        ?
                        1n :
                        0n;
+    let t_33;
     const towardX4_0 = this._equal_16(movingRight_0,
-                                      enemyFlat_0[8] > c_0[0] ? 1n : 0n)
+                                      (t_33 = enemyFlat_0[8], t_33 > c_0[0]) ?
+                                      1n :
+                                      0n)
                        ?
                        1n :
                        0n;
+    let t_34;
     const towardY4_0 = this._equal_17(movingUp_0,
-                                      enemyFlat_0[9] > c_0[1] ? 1n : 0n)
+                                      (t_34 = enemyFlat_0[9], t_34 > c_0[1]) ?
+                                      1n :
+                                      0n)
                        ?
                        1n :
                        0n;
+    let t_35;
     const towardX5_0 = this._equal_18(movingRight_0,
-                                      enemyFlat_0[10] > c_0[0] ? 1n : 0n)
+                                      (t_35 = enemyFlat_0[10], t_35 > c_0[0]) ?
+                                      1n :
+                                      0n)
                        ?
                        1n :
                        0n;
+    let t_36;
     const towardY5_0 = this._equal_19(movingUp_0,
-                                      enemyFlat_0[11] > c_0[1] ? 1n : 0n)
+                                      (t_36 = enemyFlat_0[11], t_36 > c_0[1]) ?
+                                      1n :
+                                      0n)
                        ?
                        1n :
                        0n;
+    let t_37;
     const towardX6_0 = this._equal_20(movingRight_0,
-                                      enemyFlat_0[12] > c_0[0] ? 1n : 0n)
+                                      (t_37 = enemyFlat_0[12], t_37 > c_0[0]) ?
+                                      1n :
+                                      0n)
                        ?
                        1n :
                        0n;
+    let t_38;
     const towardY6_0 = this._equal_21(movingUp_0,
-                                      enemyFlat_0[13] > c_0[1] ? 1n : 0n)
+                                      (t_38 = enemyFlat_0[13], t_38 > c_0[1]) ?
+                                      1n :
+                                      0n)
                        ?
                        1n :
                        0n;
+    let t_39;
     const towardX7_0 = this._equal_22(movingRight_0,
-                                      enemyFlat_0[14] > c_0[0] ? 1n : 0n)
+                                      (t_39 = enemyFlat_0[14], t_39 > c_0[0]) ?
+                                      1n :
+                                      0n)
                        ?
                        1n :
                        0n;
+    let t_40;
     const towardY7_0 = this._equal_23(movingUp_0,
-                                      enemyFlat_0[15] > c_0[1] ? 1n : 0n)
+                                      (t_40 = enemyFlat_0[15], t_40 > c_0[1]) ?
+                                      1n :
+                                      0n)
                        ?
                        1n :
                        0n;

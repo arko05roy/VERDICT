@@ -12,12 +12,24 @@ type GuardianEntry = {
   active: boolean;
 };
 
+type VerifierVersionEntry = {
+  versionId: number;
+  guardianMask: string;
+  guardianCount: number;
+  active: boolean;
+  createdAt: string;
+};
+
 type DAOState = {
   totalChecks: number;
   checks: GuardianEntry[];
   council: { size: number; threshold: number };
   proposals: any[];
   totalProposals: number;
+  verifierVersions: VerifierVersionEntry[];
+  totalVerifierVersions: number;
+  latestVerifierVersion: number;
+  totalRulesets: number;
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -83,9 +95,11 @@ export default function DAOPage() {
       </div>
 
       {/* Stats row */}
-      <div className="max-w-5xl mx-auto grid grid-cols-4 gap-4 mb-12">
+      <div className="max-w-5xl mx-auto grid grid-cols-6 gap-4 mb-12">
         {[
           { label: "GUARDIANS", value: dao.totalChecks, sub: "registered" },
+          { label: "VERIFIERS", value: dao.totalVerifierVersions || 1, sub: "versions" },
+          { label: "RULESETS", value: dao.totalRulesets || 0, sub: "deployed" },
           { label: "COUNCIL", value: dao.council.size, sub: "members" },
           { label: "THRESHOLD", value: dao.council.threshold, sub: "votes to pass" },
           { label: "PROPOSALS", value: dao.totalProposals, sub: "submitted" },
@@ -96,6 +110,41 @@ export default function DAOPage() {
             <p className="text-[9px] text-[var(--text-muted)] mt-1">{stat.sub}</p>
           </div>
         ))}
+      </div>
+
+      {/* Verifier Versions */}
+      <div className="max-w-5xl mx-auto mb-12">
+        <div className="flex items-center gap-3 mb-6">
+          <p className="text-[10px] text-[var(--text-muted)] tracking-[0.3em]">VERIFIER VERSIONS</p>
+          <div className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg, var(--border) 0 2px, transparent 2px 6px)" }} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {(dao.verifierVersions || []).map((ver) => (
+            <div key={ver.versionId} className={`border bg-[var(--bg-secondary)] p-4 ${ver.versionId === dao.latestVerifierVersion ? "border-[var(--accent)]" : "border-[var(--border)]"}`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-[var(--text-primary)] font-medium">
+                  v{ver.versionId}.0 {ver.versionId === 1 ? "— Genesis" : ""}
+                </span>
+                <div className="flex items-center gap-2">
+                  {ver.versionId === dao.latestVerifierVersion && (
+                    <span className="text-[8px] tracking-[0.15em] text-[var(--accent)] border border-[var(--accent)]/30 px-1 py-0.5 rounded-sm">LATEST</span>
+                  )}
+                  <span className={`w-2 h-2 rounded-full ${ver.active ? "bg-[var(--accent)]" : "bg-[var(--text-muted)]"}`} />
+                </div>
+              </div>
+              <div className="flex items-center gap-4 text-[9px] text-[var(--text-muted)]">
+                <span>{ver.guardianCount} guardians</span>
+                <span>mask: 0b{BigInt(ver.guardianMask).toString(2).padStart(10, "0")}</span>
+                <span>{ver.active ? "active" : "inactive"}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-[9px] text-[var(--text-muted)]/60 mt-3">
+          Each verifier is compiled once and immutable. New Guardians require a new version. Existing rulesets can migrate.
+        </p>
       </div>
 
       {/* Guardian Registry */}

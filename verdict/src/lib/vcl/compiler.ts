@@ -1,6 +1,6 @@
 import { CHECK_REGISTRY, getCheckById, type CheckDefinition } from "../checks/registry";
 import { CHECK_TEMPLATES, HELPER_ABSDIFF, SOFT_FAIL_VARS, WITNESS_VAR_MAP } from "../checks/templates";
-import type { VCLDocument } from "./types";
+import type { VCLDocument, VCLConfigResult } from "./types";
 
 type CompileResult =
   | { ok: true; compact: string; enabledChecks: string[]; checkCount: number }
@@ -225,4 +225,56 @@ function collectPublicParams(defs: CheckDefinition[]) {
   }
 
   return result;
+}
+
+// ─── Guardian index mapping (registry order → bit position) ───
+
+const GUARDIAN_BIT_INDEX: Record<string, number> = {};
+CHECK_REGISTRY.forEach((def, idx) => {
+  GUARDIAN_BIT_INDEX[def.id] = idx;
+});
+
+/**
+ * Compile a VCL document into a config object (no Compact code generation).
+ * Returns verifier version, enable bitmask, and flattened params.
+ */
+export function compileVCLToConfig(doc: VCLDocument): VCLConfigResult {
+  const enabledIds = doc.checks.map((c) => c.checkId);
+
+  for (const id of enabledIds) {
+    const def = getCheckById(id);
+    if (!def) return { ok: false, error: `Unknown check: ${id}` };
+  }
+
+  if (enabledIds.length === 0) {
+    return { ok: false, error: "No checks selected" };
+  }
+
+  // Compute bitmask: bit N = 1 if guardian at registry index N is enabled
+  let enableMask = 0n;
+  for (const id of enabledIds) {
+    const bitIndex = GUARDIAN_BIT_INDEX[id];
+    if (bitIndex !== undefined) {
+      enableMask |= 1n << BigInt(bitIndex);
+    }
+  }
+
+  // Flatten all params into a single map
+  const params: Record<string, string> = {};
+  for (const usage of doc.checks) {
+    for (const [key, value] of Object.entries(usage.params)) {
+      params[key] = value;
+    }
+  }
+
+  return {
+    ok: true,
+    config: {
+      verifierVersion: "1",
+      enableMask,
+      enabledChecks: enabledIds,
+      checkCount: enabledIds.length,
+      params,
+    },
+  };
 }

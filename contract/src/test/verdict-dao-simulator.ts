@@ -61,7 +61,6 @@ export class VerdictDaoSimulator {
     return this.circuitContext.currentPrivateState;
   }
 
-  /** Update the private state for the next circuit call */
   public setPrivateState(state: VerdictDaoPrivateState): void {
     this.circuitContext = createCircuitContext(
       sampleContractAddress(),
@@ -71,6 +70,8 @@ export class VerdictDaoSimulator {
     );
   }
 
+  // ── Council ──
+
   public registerCouncilMember(memberHash: Uint8Array): Ledger {
     this.circuitContext = this.contract.impureCircuits.registerCouncilMember(
       this.circuitContext,
@@ -78,6 +79,8 @@ export class VerdictDaoSimulator {
     ).context;
     return this.getLedger();
   }
+
+  // ── Guardian Registry ──
 
   public registerGenesisCheck(
     id: bigint,
@@ -123,6 +126,82 @@ export class VerdictDaoSimulator {
       proposalId,
       nameHash,
       categoryHash
+    ).context;
+    return this.getLedger();
+  }
+
+  // ── Verifier Versions ──
+
+  public registerGenesisVerifier(
+    versionId: bigint,
+    guardianMask: bigint,
+    guardianCount: bigint,
+    codeHash: Uint8Array,
+    contractAddress: Uint8Array
+  ): Ledger {
+    this.circuitContext = this.contract.impureCircuits.registerGenesisVerifier(
+      this.circuitContext,
+      versionId,
+      guardianMask,
+      guardianCount,
+      codeHash,
+      contractAddress
+    ).context;
+    return this.getLedger();
+  }
+
+  public registerVerifierVersion(
+    versionId: bigint,
+    guardianMask: bigint,
+    guardianCount: bigint,
+    codeHash: Uint8Array,
+    contractAddress: Uint8Array
+  ): Ledger {
+    this.circuitContext = this.contract.impureCircuits.registerVerifierVersion(
+      this.circuitContext,
+      versionId,
+      guardianMask,
+      guardianCount,
+      codeHash,
+      contractAddress
+    ).context;
+    return this.getLedger();
+  }
+
+  // ── Rulesets ──
+
+  public registerRuleset(
+    rulesetId: bigint,
+    verifierVersion: bigint,
+    enableMask: bigint,
+    paramsHash: Uint8Array
+  ): Ledger {
+    this.circuitContext = this.contract.impureCircuits.registerRuleset(
+      this.circuitContext,
+      rulesetId,
+      verifierVersion,
+      enableMask,
+      paramsHash
+    ).context;
+    return this.getLedger();
+  }
+
+  public migrateRuleset(
+    rulesetId: bigint,
+    newVerifierVersion: bigint
+  ): Ledger {
+    this.circuitContext = this.contract.impureCircuits.migrateRuleset(
+      this.circuitContext,
+      rulesetId,
+      newVerifierVersion
+    ).context;
+    return this.getLedger();
+  }
+
+  public deactivateRuleset(rulesetId: bigint): Ledger {
+    this.circuitContext = this.contract.impureCircuits.deactivateRuleset(
+      this.circuitContext,
+      rulesetId
     ).context;
     return this.getLedger();
   }

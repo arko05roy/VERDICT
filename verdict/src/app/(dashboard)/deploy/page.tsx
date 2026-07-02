@@ -54,6 +54,7 @@ export default function DeployPage() {
   const [compact, setCompact] = useState("");
   const [vcl, setVcl] = useState("");
   const [compileError, setCompileError] = useState("");
+  const [compiledConfig, setCompiledConfig] = useState<any>(null);
 
   // Step 5 state
   const [deploying, setDeploying] = useState(false);
@@ -196,7 +197,12 @@ export default function DeployPage() {
         setCompileError(errMsg);
         return;
       }
-      setCompact(data.compact);
+      if (data.config) {
+        setCompiledConfig(data.config);
+      }
+      if (data.compact) {
+        setCompact(data.compact);
+      }
       transitionTo(4);
     } catch (e: any) {
       setCompileError(e.message || "Network error");
@@ -213,12 +219,14 @@ export default function DeployPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          compact,
           name,
           description,
           tags,
           enabledChecks: [...enabledChecks],
           vcl,
+          verifierVersion: compiledConfig?.verifierVersion || "1",
+          enableMask: compiledConfig?.enableMask || "1023",
+          params: compiledConfig?.params || {},
         }),
       });
       const data = await res.json();
@@ -235,7 +243,7 @@ export default function DeployPage() {
   function resetAll() {
     setSystemDescription(""); setName(""); setDescription(""); setTagsInput("");
     setEnabledChecks(new Set()); setSuggestions([]); setCheckParams({});
-    setCompact(""); setVcl(""); setCompileError(""); setDeployResult(null);
+    setCompact(""); setVcl(""); setCompileError(""); setCompiledConfig(null); setDeployResult(null);
     setError(""); closeModal();
   }
 
@@ -251,8 +259,8 @@ export default function DeployPage() {
     { n: 1, numeral: "I", label: "DESCRIBE", title: "The Oracle", desc: "Describe your system" },
     { n: 2, numeral: "II", label: "CHOOSE", title: "The Fates", desc: "Select your guardians" },
     { n: 3, numeral: "III", label: "CONFIGURE", title: "The Scribe", desc: "Set parameters" },
-    { n: 4, numeral: "IV", label: "REVIEW", title: "The Eye", desc: "Review compiled circuit" },
-    { n: 5, numeral: "V", label: "DEPLOY", title: "The Architect", desc: "Deploy to Midnight" },
+    { n: 4, numeral: "IV", label: "REVIEW", title: "The Eye", desc: "Review configuration" },
+    { n: 5, numeral: "V", label: "REGISTER", title: "The Architect", desc: "Register ruleset" },
   ];
 
   function setParam(checkId: string, paramName: string, value: string) {
@@ -521,7 +529,7 @@ export default function DeployPage() {
               <div>
                 <p className="text-[10px] text-[var(--text-muted)] tracking-[0.3em] mb-1">IV</p>
                 <h2 className="text-xl text-[var(--text-primary)] mb-1">The Eye</h2>
-                <p className="text-xs text-[var(--text-secondary)] mb-6">Review the deterministically compiled Compact circuit.</p>
+                <p className="text-xs text-[var(--text-secondary)] mb-6">Review your ruleset configuration before registering.</p>
 
                 <div className="mb-4 p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-sm">
                   <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-2">ACTIVE GUARDIANS</p>
@@ -537,24 +545,41 @@ export default function DeployPage() {
                   </div>
                 </div>
 
+                {/* Config summary */}
+                {compiledConfig && (
+                  <div className="mb-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-sm">
+                        <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-1">VERIFIER VERSION</p>
+                        <p className="text-sm text-[var(--text-primary)]">v{compiledConfig.verifierVersion}.0 — Genesis</p>
+                      </div>
+                      <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-sm">
+                        <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-1">ENABLE MASK</p>
+                        <p className="text-sm text-[var(--text-primary)] font-mono">0b{BigInt(compiledConfig.enableMask).toString(2).padStart(10, "0")}</p>
+                      </div>
+                    </div>
+
+                    {Object.keys(compiledConfig.params || {}).length > 0 && (
+                      <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-sm">
+                        <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-2">PARAMETERS</p>
+                        <div className="space-y-1">
+                          {Object.entries(compiledConfig.params).map(([k, v]) => (
+                            <div key={k} className="flex justify-between text-xs">
+                              <span className="text-[var(--text-secondary)]">{k}</span>
+                              <span className="text-[var(--text-primary)] font-mono">{String(v)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* VCL source */}
                 <details className="mb-4">
                   <summary className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] cursor-pointer hover:text-[var(--text-secondary)]">VCL SOURCE</summary>
                   <pre className="mt-2 p-3 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-sm text-xs text-[var(--text-secondary)] overflow-x-auto max-h-40">{vcl}</pre>
                 </details>
-
-                {/* Compact output */}
-                <div>
-                  <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-2">COMPILED COMPACT</p>
-                  <pre className="p-4 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-sm text-xs text-[var(--text-secondary)] overflow-auto max-h-96 leading-relaxed">
-                    {compact.split("\n").map((line, i) => (
-                      <div key={i} className="flex">
-                        <span className="text-[var(--text-muted)]/30 w-8 text-right mr-3 select-none">{i + 1}</span>
-                        <span>{line}</span>
-                      </div>
-                    ))}
-                  </pre>
-                </div>
 
                 <div className="flex justify-between items-center mt-8 pt-4 border-t border-[var(--border)]">
                   <button onClick={() => transitionTo(3)} className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]">{"\u2190"} Back</button>
@@ -563,7 +588,7 @@ export default function DeployPage() {
                     disabled={deploying}
                     className="px-6 py-2 text-xs tracking-[0.2em] border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent-glow)] disabled:opacity-30 transition-colors"
                   >
-                    {deploying ? "DEPLOYING..." : "DEPLOY TO MIDNIGHT \u2192"}
+                    {deploying ? "REGISTERING..." : "REGISTER RULESET \u2192"}
                   </button>
                 </div>
               </div>
@@ -574,7 +599,7 @@ export default function DeployPage() {
               <div className="text-center">
                 <p className="text-[10px] text-[var(--text-muted)] tracking-[0.3em] mb-1">V</p>
                 <h2 className="text-xl text-[var(--text-primary)] mb-1">The Architect</h2>
-                <p className="text-xs text-[var(--accent)] mb-8">{"\u2726"} Ruleset deployed successfully</p>
+                <p className="text-xs text-[var(--accent)] mb-8">{"\u2726"} Ruleset registered successfully</p>
 
                 <div className="text-left space-y-3 mb-8">
                   <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-sm">
@@ -589,6 +614,16 @@ export default function DeployPage() {
                     <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-sm">
                       <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-1">GUARDIANS</p>
                       <p className="text-xs text-[var(--text-primary)]">{deployResult.checkCount || enabledChecks.size}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-sm">
+                      <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-1">VERIFIER</p>
+                      <p className="text-xs text-[var(--text-primary)]">v{deployResult.verifierVersion || "1"}.0</p>
+                    </div>
+                    <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-sm">
+                      <p className="text-[10px] text-[var(--text-muted)] tracking-[0.2em] mb-1">NETWORK</p>
+                      <p className="text-xs text-[var(--text-primary)]">{deployResult.network || "preprod"}</p>
                     </div>
                   </div>
                   <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-sm">
