@@ -70,18 +70,31 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Find the wallet provider — try mnLace first, then first available key
+    // Find the Midnight wallet provider among all injected wallets
     const mn = window.midnight;
-    const wallet = mn.mnLace ?? mn[Object.keys(mn)[0]];
-    if (!wallet) {
+    const providers = Object.values(mn);
+    if (providers.length === 0) {
       setLaceDetected(false);
       return;
     }
 
     setIsConnecting(true);
     try {
-      console.log("[VERDICT] Connecting via wallet:", wallet.name, "apiVersion:", wallet.apiVersion);
-      const api = await wallet.connect("preprod");
+      // Try each provider until one accepts "preprod" (skip Cardano wallets that reject it)
+      let api: ConnectedAPI | null = null;
+      for (const provider of providers) {
+        try {
+          console.log("[VERDICT] Trying provider:", provider.name, "rdns:", provider.rdns);
+          api = await provider.connect("preprod");
+          console.log("[VERDICT] Connected via:", provider.name, "rdns:", provider.rdns);
+          break;
+        } catch {
+          console.warn(`[VERDICT] Provider "${provider.name}" rejected preprod, skipping`);
+        }
+      }
+      if (!api) {
+        throw new Error("No wallet provider accepted preprod network. Check Lace Midnight Preview is installed.");
+      }
       setConnectedApi(api);
 
       // Fetch address
@@ -104,7 +117,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
       // Verify connection
       const connStatus = await api.getConnectionStatus();
+      console.log("[VERDICT] Connection status:", connStatus);
       if (connStatus.status === "connected") {
+        console.log("[VERDICT] Connected to network:", connStatus.networkId);
         setIsConnected(true);
       }
     } catch (err) {
