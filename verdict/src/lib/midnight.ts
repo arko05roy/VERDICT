@@ -15,7 +15,7 @@ import {
   Verdict,
   type VerdictPrivateState,
   witnesses,
-} from "@midnight-ntwrk/verdict-contract";
+} from "../../../contract/dist/index.js";
 import * as ledger from "@midnight-ntwrk/ledger-v7";
 import { unshieldedToken } from "@midnight-ntwrk/ledger-v7";
 import { deployContract, findDeployedContract } from "@midnight-ntwrk/midnight-js-contracts";
