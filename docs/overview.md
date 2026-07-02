@@ -6,44 +6,47 @@ Every day, you interact with systems that enforce rules you cannot verify.
 
 Your insurance claim — processed by an algorithm you can't inspect. Your trade on an exchange — executed at a price you have to trust. Your loan application — scored by a model that won't show its math. Your game — adjudicated by a server that could be lying about every outcome.
 
-These aren't edge cases. This is the default. Every platform, every service, every institution that processes your data runs the same architecture: a black box that takes your inputs, applies rules internally, and tells you what happened. You have no proof the rules were followed.
-
 The structural problem: **the entity enforcing the rules is often the same entity that profits from breaking them.**
 
 There is zero cryptographic proof that any rule was ever applied correctly. You're trusting a `console.log` on someone else's server.
 
-That's not integrity. That's faith.
-
 ## What VERDICT Does
 
-VERDICT is a **universal ZK integrity protocol** built on [Midnight](https://midnight.network). It doesn't replace existing systems. It doesn't touch business logic. It sits underneath and asks one question: **was this state transition valid?**
+VERDICT is a **universal ZK integrity protocol** built on [Midnight](https://midnight.network). It sits underneath any rule-based system and asks one question: **was this state transition valid?**
 
-Any system that processes state transitions — games, exchanges, insurance, lending, compliance — can plug into VERDICT. The system defines its rules as parameters. VERDICT runs **10 mathematical checks** inside a ZK circuit per transition. The proof settles on Midnight. The data stays private. The verdict is public.
+Any system that processes state transitions — games, exchanges, insurance, lending, compliance — can plug into VERDICT. The system selects which checks apply, configures their parameters, and registers a **ruleset**. The proof settles on Midnight. The data stays private. The verdict is public.
 
 `CLEAN` or `FLAGGED`. That's it.
 
-## How It Works
+## Architecture
+
+VERDICT uses a **Registry + Versioned Verifier** model:
 
 ```
-Your System (games, finance, insurance — anything rule-based)
-    │
-    ├─ Captures state transitions (prev state → current state + action)
-    │
-    └─ Submits as ZK witness (private — never revealed)
-            │
-            ├─ ZK circuit runs 10 checks (~2-5s proof time)
-            │
-            └─ Proof settles on Midnight
-                    │
-                    └─ Returns: CLEAN (0) or FLAGGED (1)
-                       On-chain: totalChecks, totalFlagged, lastVerdict
+VERDICT DAO (on-chain governance)
+    |
+    +-- Guardian Registry (10 genesis checks, extensible via proposals)
+    |
+    +-- Verifier Versions (immutable, compiled once per Guardian set)
+    |     +-- v1.0 — Guardians I-X (genesis)
+    |     +-- v1.1 — Guardians I-XI (after DAO approves Guardian XI)
+    |     +-- ...
+    |
+    +-- Rulesets (lightweight entries, no compilation needed)
+          +-- Ruleset A -> Verifier v1.0, mask=0b1111100011, params={...}
+          +-- Ruleset B -> Verifier v1.0, mask=0b1111111111, params={...}
+          +-- Ruleset C -> Verifier v1.1, mask=0b11111111111, params={...}
 ```
 
-The system under verification never pauses. VERDICT operates asynchronously in the background. If a violation is detected, it's flagged retroactively — with mathematical certainty.
+**Verifier contracts** are compiled once and immutable. They contain a fixed set of Guardians. New Guardians require a new verifier version — old ones are never modified.
+
+**Rulesets** are lightweight on-chain entries. They reference a verifier version, specify which Guardians to enable (bitmask), and set parameters. No contract compilation needed — registering a ruleset is instant.
+
+**Migration** is opt-in. When the DAO approves a new Guardian and a new verifier version is compiled, existing rulesets keep working on their current verifier. Owners can migrate to the new version if they want the new Guardian.
 
 ## The Guardians
 
-VERDICT's verification primitives are called **Guardians** — each named after a figure from Greek or Roman mythology. They are modular: you select which Guardians your system needs, configure their parameters, and deploy a custom circuit containing only those checks.
+VERDICT's verification primitives are called **Guardians** — each named after a figure from Greek or Roman mythology.
 
 | # | Guardian | Category | What It Proves |
 |---|----------|----------|----------------|
@@ -58,34 +61,23 @@ VERDICT's verification primitives are called **Guardians** — each named after 
 | IX | **Daedalus** | Behavioral | Precision anomaly — detects inhuman accuracy patterns |
 | X | **Prometheus** | Information | Knowledge leakage — detects correlation with hidden data |
 
-Guardians I-II use hard assertions — if broken, no valid proof exists. Guardians III-X are soft flags that aggregate into the final verdict. Tampered data is unprovable; rule violations are provable and recorded on-chain.
+Guardians I-II use hard assertions — if broken, no valid proof exists. Guardians III-X are soft flags that aggregate into the final verdict.
 
-Rulesets are defined using **VCL (Verdict Compile Language)** — a declaration format that deterministically compiles to Compact ZK circuits. No AI generates code. The Guardian library is governed by an on-chain DAO where anyone can propose new Guardians for community vote.
+Rulesets are configured using **VCL (Verdict Compile Language)** — a declaration format that maps Guardian selections and parameters to a verifier version + bitmask. The Guardian library is governed by an on-chain DAO.
 
-See [The 10 Checks](./the-10-checks.md) for the full breakdown with actual circuit code.
+## Governance
 
-## Why Midnight?
+The VERDICT DAO manages:
 
-Midnight's Compact language compiles directly to ZK circuits. Privacy isn't bolted on — it's the execution model.
+- **Guardian Registry** — propose, vote, and register new Guardians
+- **Verifier Versions** — council members register new versions when Guardians are added
+- **Rulesets** — anyone can register a ruleset against an active verifier version
 
-- **Private by default:** All actor data enters as witnesses. The circuit verifies it. Nothing is revealed on-chain.
-- **Verifiable by anyone:** The proof is publicly verifiable without seeing the inputs.
-- **Lightweight:** ~940 R1CS constraints. ~2-5s proof time. Async settlement.
-- **Dual ledger:** Public state (verdicts, counters) and private state (witnesses) coexist natively.
-
-Remove Midnight from VERDICT, and you're back to trusting the system's `console.log`.
-
-## It's a Protocol, Not a Product
-
-VERDICT is infrastructure. Like Chainlink doesn't build your oracle — it provides the oracle network. Like The Graph doesn't build your subgraph — it provides the indexing protocol.
-
-VERDICT doesn't build your system. It provides the integrity layer.
-
-Every system gets its own **ruleset** — a deployed Compact contract on Midnight with its own parameters. Different rules, same verification engine. Insurance claim processing, exchange trade execution, game anti-cheat, lending compliance — each is a deployed ruleset. You don't build a new system per use case. You deploy a ruleset.
+Council-based voting with on-chain double-vote prevention. The 10 genesis Guardians are pre-registered at deployment.
 
 ## On-Chain State
 
-Each deployed ruleset maintains public ledger state:
+Each verifier contract maintains public ledger state per session:
 
 | Field | Type | Meaning |
 |-------|------|---------|
@@ -96,11 +88,26 @@ Each deployed ruleset maintains public ledger state:
 | `lastChainHash` | Bytes<32> | Current hash chain head |
 | `sessionActive` | Boolean | Whether a session is active |
 
-This is what accountability looks like. Every ruleset has a public integrity profile. Total verifications. Flagged rate. All on-chain. All auditable.
+The DAO contract tracks:
 
-No more trusting platforms when they say "we follow the rules." Show me the proof. Literally.
+| Field | Type | Meaning |
+|-------|------|---------|
+| `verifierVersions` | Map | All registered verifier versions |
+| `rulesets` | Map | All registered rulesets (id, verifier, mask, params) |
+| `checkRegistry` | Map | All registered Guardians |
+| `proposals` | Map | Active governance proposals |
+
+## Why Midnight?
+
+Midnight's Compact language compiles directly to ZK circuits. Privacy isn't bolted on — it's the execution model.
+
+- **Private by default:** All actor data enters as witnesses. Nothing is revealed on-chain.
+- **Verifiable by anyone:** The proof is publicly verifiable without seeing the inputs.
+- **Lightweight:** ~940 R1CS constraints. ~2-5s proof time. Async settlement.
+- **Dual ledger:** Public state (verdicts) and private state (witnesses) coexist natively.
 
 ## Next Steps
 
-- [The 10 Checks](./the-10-checks.md) — full breakdown with circuit code from `verdict.compact`
+- [The 10 Checks](./the-10-checks.md) — full breakdown with circuit code
 - [Integration Guide](./integration-guide.md) — how to integrate VERDICT into your system
+- [Whitepaper](./whitepaper.md) — complete protocol specification
