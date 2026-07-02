@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useWallet } from "@/lib/wallet-context";
 
 type FeedEntry = {
   ruleset: string;
@@ -49,6 +50,7 @@ export default function OverviewPage() {
   const [network, setNetwork] = useState<NetworkStatus | null>(null);
   const [rulesets, setRulesets] = useState<Ruleset[]>([]);
   const [mounted, setMounted] = useState(false);
+  const wallet = useWallet();
 
   useEffect(() => {
     setMounted(true);
@@ -135,6 +137,55 @@ export default function OverviewPage() {
           The all-seeing eye. Real-time protocol activity on Midnight.
         </p>
       </div>
+
+      {/* ═══ Wallet Card ═══ */}
+      {wallet.isConnected && wallet.address && (
+        <div
+          className="relative mb-6"
+          style={{
+            opacity: mounted ? 1 : 0,
+            transition: "opacity 0.5s ease 0.3s",
+          }}
+        >
+          <div className="absolute inset-0 border border-[var(--accent)]" style={{ background: "var(--bg-secondary)" }} />
+          <div className="absolute inset-[3px] border border-[var(--border)]" />
+          <div className="absolute top-[5px] left-[5px] text-[5px] text-[var(--accent-dim)]">◆</div>
+          <div className="absolute top-[5px] right-[5px] text-[5px] text-[var(--accent-dim)]">◆</div>
+          <div className="absolute bottom-[5px] left-[5px] text-[5px] text-[var(--accent-dim)] rotate-180">◆</div>
+          <div className="absolute bottom-[5px] right-[5px] text-[5px] text-[var(--accent-dim)] rotate-180">◆</div>
+
+          <div className="relative flex items-center px-6 py-3 gap-6">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 bg-[var(--accent)] live-dot" />
+              <span className="text-[9px] text-[var(--accent)] uppercase tracking-[0.2em] font-bold">
+                Wallet Connected
+              </span>
+            </div>
+            <div className="w-px h-4 bg-[var(--border)]" />
+            <span className="text-[10px] text-[var(--text-secondary)] font-mono" title={wallet.address}>
+              {wallet.address.slice(0, 16)}...{wallet.address.slice(-8)}
+            </span>
+            <div className="w-px h-4 bg-[var(--border)]" />
+            <span className="text-[10px] text-[var(--text-secondary)]">
+              {BigInt(wallet.balance).toLocaleString()} tNight
+            </span>
+            <div className="w-px h-4 bg-[var(--border)]" />
+            <span className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider">
+              Preprod
+            </span>
+            <div className="ml-auto">
+              <a
+                href="https://faucet.preprod.midnight.network/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[9px] uppercase tracking-[0.15em] text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors border border-[var(--border)] hover:border-[var(--accent-dim)] px-2 py-1"
+              >
+                Get tNight from Faucet →
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══ Stats — Tarot-style cards ═══ */}
       <div className="grid grid-cols-4 gap-4 mb-6">

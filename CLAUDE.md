@@ -94,6 +94,22 @@ cd verdict && npx tsx -e 'import { parseVCL, compileVCL } from "./src/lib/vcl"; 
 cd verdict && npm run dev
 ```
 
+### Lace Wallet Integration (DApp Connector)
+- Client-side via `@midnight-ntwrk/dapp-connector-api@4.0.1`
+- Wallet context: `src/lib/wallet-context.tsx` — `WalletProvider` + `useWallet()` hook
+- Lace injects `window.midnight.mnLace` (or other keys) asynchronously
+- Connect flow: `wallet.connect('preprod')` → `getShieldedAddresses()` → `getUnshieldedBalances()`
+- Detection polls for up to 10s; falls back to first available `window.midnight` key
+- Sidebar shows 3 states: connected, install Lace, connect button
+
+### Preprod Network Endpoints
+- Node: `https://rpc.preprod.midnight.network`
+- Indexer: `https://indexer.preprod.midnight.network/api/v3/graphql`
+- Indexer WS: `wss://indexer.preprod.midnight.network/api/v3/graphql/ws`
+- Proof Server: `https://lace-proof-pub.preprod.midnight.network`
+- Faucet: `https://faucet.preprod.midnight.network/`
+- Explorer: `https://explorer.preprod.midnight.network`
+
 ## Rules
 
 - verdict.compact is the REFERENCE implementation — do NOT modify it
