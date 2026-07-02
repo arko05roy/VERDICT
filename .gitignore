@@ -1,6 +1,6 @@
 /node_modules
 /dist
 /counter-cli/dist
-/contract/dist
+# /contract/dist — committed so Vercel can resolve @midnight-ntwrk/verdict-contract
 /verdict-demo/midnight-level-db
 /jarvis copy.md
