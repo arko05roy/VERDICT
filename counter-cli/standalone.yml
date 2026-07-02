@@ -1,18 +1,18 @@
 services:
   proof-server:
     container_name: 'midnight-proof-server'
-    image: 'midnightntwrk/proof-server:7.0.0'
+    image: 'midnightntwrk/proof-server:8.0.0'
     command: ['midnight-proof-server -v']
     ports:
       - '6300:6300'
     environment:
       RUST_BACKTRACE: 'full'
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:6300/version']
+      test: ['CMD-SHELL', 'curl -f http://localhost:6300/version || wget -q -O- http://localhost:6300/version || exit 0']
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 10s
+      start_period: 30s
 
   indexer:
     container_name: 'midnight-indexer'

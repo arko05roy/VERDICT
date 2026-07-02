@@ -1,67 +1,87 @@
 /**
- * Server-side Midnight provider — LOCAL SIMULATOR MODE.
+ * Server-side Midnight provider — REAL NETWORK MODE.
  *
- * Bypasses proof server, node, and indexer entirely. Runs the real ZK circuit
- * logic locally via VerdictSimulator (same circuit, same 10 checks, instant).
+ * Connects to actual Midnight node, indexer, and proof server via env vars.
+ * Deploys real contracts and queries real on-chain state.
  *
- * All API routes import from this file — no changes needed downstream.
+ * All API routes import from this file — export interface unchanged.
  */
 
-import {
-  sampleContractAddress,
-  createConstructorContext,
-  createCircuitContext,
-} from "@midnight-ntwrk/compact-runtime";
+import path from "node:path";
+import fs from "node:fs";
+import crypto from "node:crypto";
+import { type ContractAddress } from "@midnight-ntwrk/compact-runtime";
 import {
   Verdict,
   type VerdictPrivateState,
   witnesses,
 } from "@midnight-ntwrk/verdict-contract";
-import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
-import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
+import * as ledger from "@midnight-ntwrk/ledger-v7";
+import { unshieldedToken } from "@midnight-ntwrk/ledger-v7";
+import { deployContract, findDeployedContract } from "@midnight-ntwrk/midnight-js-contracts";
+import { httpClientProofProvider } from "@midnight-ntwrk/midnight-js-http-client-proof-provider";
+import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider";
+import { levelPrivateStateProvider } from "@midnight-ntwrk/midnight-js-level-private-state-provider";
+import { NodeZkConfigProvider } from "@midnight-ntwrk/midnight-js-node-zk-config-provider";
+import {
+  setNetworkId,
+  getNetworkId,
+} from "@midnight-ntwrk/midnight-js-network-id";
+import type {
+  MidnightProvider,
+  WalletProvider,
+} from "@midnight-ntwrk/midnight-js-types";
+import { assertIsContractAddress, toHex } from "@midnight-ntwrk/midnight-js-utils";
+import { WalletFacade } from "@midnight-ntwrk/wallet-sdk-facade";
+import { DustWallet } from "@midnight-ntwrk/wallet-sdk-dust-wallet";
+import { HDWallet, Roles } from "@midnight-ntwrk/wallet-sdk-hd";
+import { ShieldedWallet } from "@midnight-ntwrk/wallet-sdk-shielded";
+import {
+  createKeystore,
+  InMemoryTransactionHistoryStorage,
+  PublicKey,
+  UnshieldedWallet,
+  type UnshieldedKeystore,
+} from "@midnight-ntwrk/wallet-sdk-unshielded-wallet";
+import { CompiledContract } from "@midnight-ntwrk/compact-js";
+import type { ImpureCircuitId } from "@midnight-ntwrk/compact-js";
+import { Buffer } from "buffer";
+import * as Rx from "rxjs";
+import { WebSocket } from "ws";
+
+// ─── Globals for GraphQL subscriptions ──────────────────────────────────────
+
+// @ts-expect-error: Needed for GraphQL subscriptions in Node.js
+globalThis.WebSocket = WebSocket;
+
+// ─── Config from env ────────────────────────────────────────────────────────
+
+const NODE_URL = process.env.MIDNIGHT_NODE_URL || "http://127.0.0.1:9944";
+const INDEXER_URL =
+  process.env.MIDNIGHT_INDEXER_URL || "http://127.0.0.1:8088/api/v3/graphql";
+const INDEXER_WS_URL =
+  process.env.MIDNIGHT_INDEXER_WS_URL ||
+  "ws://127.0.0.1:8088/api/v3/graphql/ws";
+const PROOF_SERVER_URL =
+  process.env.MIDNIGHT_PROOF_SERVER_URL || "http://127.0.0.1:6300";
+
+const GENESIS_SEED =
+  "0000000000000000000000000000000000000000000000000000000000000001";
+
+const ZK_CONFIG_PATH = path.resolve(
+  process.cwd(),
+  "..",
+  "contract",
+  "src",
+  "managed",
+  "verdict"
+);
+
+const PRIVATE_STATE_ID = "verdictPrivateState" as const;
 
 // ─── Init ───────────────────────────────────────────────────────────────────
 
 setNetworkId("undeployed");
-
-// ─── Persistence ────────────────────────────────────────────────────────────
-
-const STORE_PATH = path.resolve(process.cwd(), ".verdict-store.json");
-
-interface PersistedEntry {
-  ruleset: DeployedRuleset;
-  totalChecks: number;
-  totalFlagged: number;
-  lastVerdict: number;
-}
-
-function loadStore(): PersistedEntry[] {
-  try {
-    if (fs.existsSync(STORE_PATH)) {
-      const raw = fs.readFileSync(STORE_PATH, "utf-8");
-      return JSON.parse(raw);
-    }
-  } catch (err) {
-    console.error("[simulator] Failed to load store:", err);
-  }
-  return [];
-}
-
-function saveStore() {
-  const entries: PersistedEntry[] = Array.from(deployedRulesets.values()).map((e) => ({
-    ruleset: e.ruleset,
-    totalChecks: e.totalChecks,
-    totalFlagged: e.totalFlagged,
-    lastVerdict: e.lastVerdict,
-  }));
-  try {
-    fs.writeFileSync(STORE_PATH, JSON.stringify(entries, null, 2));
-  } catch (err) {
-    console.error("[simulator] Failed to save store:", err);
-  }
-}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -75,70 +95,345 @@ export interface DeployedRuleset {
   compact: string;
 }
 
-interface SimulatorEntry {
-  ruleset: DeployedRuleset;
-  contract: Verdict.Contract<VerdictPrivateState>;
-  circuitContext: ReturnType<typeof createCircuitContext>;
-  totalChecks: number;
-  totalFlagged: number;
-  lastVerdict: number; // 0 = clean, 1 = flagged
-}
+type VerdictCircuits = ImpureCircuitId<Verdict.Contract<VerdictPrivateState>>;
 
-// ─── In-memory state ────────────────────────────────────────────────────────
-
-const deployedRulesets: Map<string, SimulatorEntry> = new Map();
-let blockHeight = 1;
-
-// Increment block height over time to simulate chain progression
-setInterval(() => {
-  blockHeight++;
-}, 12_000); // ~12s block time like Midnight
-
-// ─── Default game rules (matches contract tests) ───────────────────────────
-
-const RULES = {
-  maxVelocity: 100n,
-  maxAcceleration: 50n,
-  boundX: 1000n,
-  boundY: 1000n,
-  validActionCount: 4n,
-  maxActionsPerWindow: 8n,
-  windowSize: 100n,
-  minDiversity: 10n,
-  snapThreshold: 1000n,
-  maxSnaps: 4n,
-  maxCorrelation: 14n,
+type VerdictProviders = {
+  privateStateProvider: any;
+  publicDataProvider: ReturnType<typeof indexerPublicDataProvider>;
+  zkConfigProvider: NodeZkConfigProvider<VerdictCircuits>;
+  proofProvider: any;
+  walletProvider: WalletProvider & MidnightProvider;
+  midnightProvider: WalletProvider & MidnightProvider;
 };
 
+interface WalletContext {
+  wallet: WalletFacade;
+  shieldedSecretKeys: ledger.ZswapSecretKeys;
+  dustSecretKey: ledger.DustSecretKey;
+  unshieldedKeystore: UnshieldedKeystore;
+}
+
+interface RulesetEntry {
+  ruleset: DeployedRuleset;
+}
+
+// ─── Persistence ────────────────────────────────────────────────────────────
+
+const STORE_PATH = path.resolve(process.cwd(), ".verdict-store.json");
+
+function loadStore(): RulesetEntry[] {
+  try {
+    if (fs.existsSync(STORE_PATH)) {
+      const raw = fs.readFileSync(STORE_PATH, "utf-8");
+      return JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error("[midnight] Failed to load store:", err);
+  }
+  return [];
+}
+
+function saveStore() {
+  const entries: RulesetEntry[] = Array.from(rulesetRegistry.values()).map(
+    (e) => ({ ruleset: e.ruleset })
+  );
+  try {
+    fs.writeFileSync(STORE_PATH, JSON.stringify(entries, null, 2));
+  } catch (err) {
+    console.error("[midnight] Failed to save store:", err);
+  }
+}
+
+// ─── Registry (persisted to disk, survives module reloads in dev) ───────────
+
+// Use globalThis to survive Next.js dev mode module re-evaluation
+const _global = globalThis as any;
+if (!_global.__verdictRulesetRegistry) {
+  _global.__verdictRulesetRegistry = new Map<string, RulesetEntry>();
+}
+const rulesetRegistry: Map<string, RulesetEntry> =
+  _global.__verdictRulesetRegistry;
+
+// ─── Compiled contract ──────────────────────────────────────────────────────
+
+const verdictCompiledContract = CompiledContract.make(
+  "verdict",
+  Verdict.Contract
+).pipe(
+  CompiledContract.withWitnesses(witnesses),
+  CompiledContract.withCompiledFileAssets(ZK_CONFIG_PATH)
+);
+
 const defaultPrivateState: VerdictPrivateState = {
-  prevPrevPos: [100n, 100n],
-  prevPos: [105n, 105n],
-  currPos: [110n, 110n],
+  prevPrevPos: [0n, 0n],
+  prevPos: [0n, 0n],
+  currPos: [0n, 0n],
   action: 0n,
-  isFirstMove: 0n,
+  isFirstMove: 1n,
   prevHash: new Uint8Array(32),
   nonce: new Uint8Array(32),
-  aimHistory: [
-    100n, 100n, 102n, 101n, 104n, 102n, 106n, 103n,
-    108n, 104n, 110n, 105n, 112n, 106n, 114n, 107n,
-  ],
-  actionHistory: [0n, 1n, 2n, 3n, 0n, 1n, 2n, 3n],
-  tickHistory: [110n, 120n, 130n, 140n, 150n, 160n, 170n, 180n],
-  currentTick: 190n,
+  aimHistory: new Array(16).fill(0n) as bigint[],
+  actionHistory: new Array(8).fill(0n) as bigint[],
+  tickHistory: new Array(8).fill(0n) as bigint[],
+  currentTick: 0n,
   enemyPositions: new Array(16).fill(0n) as bigint[],
 };
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Wallet + Provider singleton (survives dev mode re-evaluation) ──────────
 
-function randomHex(bytes: number): string {
-  return crypto.randomBytes(bytes).toString("hex");
+if (!_global.__verdictWalletCtx) _global.__verdictWalletCtx = null;
+if (!_global.__verdictProviders) _global.__verdictProviders = null;
+if (!_global.__verdictInitPromise) _global.__verdictInitPromise = null;
+
+let _walletCtx: WalletContext | null = _global.__verdictWalletCtx;
+let _providers: VerdictProviders | null = _global.__verdictProviders;
+let _initPromise: Promise<void> | null = _global.__verdictInitPromise;
+
+function deriveKeysFromSeed(seed: string) {
+  const hdWallet = HDWallet.fromSeed(Buffer.from(seed, "hex"));
+  if (hdWallet.type !== "seedOk")
+    throw new Error("Failed to initialize HDWallet from seed");
+  const derivationResult = hdWallet.hdWallet
+    .selectAccount(0)
+    .selectRoles([Roles.Zswap, Roles.NightExternal, Roles.Dust])
+    .deriveKeysAt(0);
+  if (derivationResult.type !== "keysDerived")
+    throw new Error("Failed to derive keys");
+  hdWallet.hdWallet.clear();
+  return derivationResult.keys;
 }
 
-function randomAddress(): string {
-  return randomHex(32);
+const signTransactionIntents = (
+  tx: { intents?: Map<number, any> },
+  signFn: (payload: Uint8Array) => ledger.Signature,
+  proofMarker: "proof" | "pre-proof"
+): void => {
+  if (!tx.intents || tx.intents.size === 0) return;
+  for (const segment of tx.intents.keys()) {
+    const intent = tx.intents.get(segment);
+    if (!intent) continue;
+    const cloned =
+      ledger.Intent.deserialize<
+        ledger.SignatureEnabled,
+        ledger.Proofish,
+        ledger.PreBinding
+      >("signature", proofMarker, "pre-binding", intent.serialize());
+    const sigData = cloned.signatureData(segment);
+    const signature = signFn(sigData);
+    if (cloned.fallibleUnshieldedOffer) {
+      const sigs = cloned.fallibleUnshieldedOffer.inputs.map(
+        (_: ledger.UtxoSpend, i: number) =>
+          cloned.fallibleUnshieldedOffer!.signatures.at(i) ?? signature
+      );
+      cloned.fallibleUnshieldedOffer =
+        cloned.fallibleUnshieldedOffer.addSignatures(sigs);
+    }
+    if (cloned.guaranteedUnshieldedOffer) {
+      const sigs = cloned.guaranteedUnshieldedOffer.inputs.map(
+        (_: ledger.UtxoSpend, i: number) =>
+          cloned.guaranteedUnshieldedOffer!.signatures.at(i) ?? signature
+      );
+      cloned.guaranteedUnshieldedOffer =
+        cloned.guaranteedUnshieldedOffer.addSignatures(sigs);
+    }
+    tx.intents.set(segment, cloned);
+  }
+};
+
+async function createWalletAndMidnightProvider(
+  ctx: WalletContext
+): Promise<WalletProvider & MidnightProvider> {
+  const state = await Rx.firstValueFrom(
+    ctx.wallet.state().pipe(Rx.filter((s) => s.isSynced))
+  );
+  return {
+    getCoinPublicKey() {
+      return state.shielded.coinPublicKey.toHexString();
+    },
+    getEncryptionPublicKey() {
+      return state.shielded.encryptionPublicKey.toHexString();
+    },
+    async balanceTx(tx, ttl?) {
+      const recipe = await ctx.wallet.balanceUnboundTransaction(
+        tx,
+        {
+          shieldedSecretKeys: ctx.shieldedSecretKeys,
+          dustSecretKey: ctx.dustSecretKey,
+        },
+        { ttl: ttl ?? new Date(Date.now() + 30 * 60 * 1000) }
+      );
+      const signFn = (payload: Uint8Array) =>
+        ctx.unshieldedKeystore.signData(payload);
+      signTransactionIntents(recipe.baseTransaction, signFn, "proof");
+      if (recipe.balancingTransaction) {
+        signTransactionIntents(
+          recipe.balancingTransaction,
+          signFn,
+          "pre-proof"
+        );
+      }
+      return ctx.wallet.finalizeRecipe(recipe);
+    },
+    submitTx(tx) {
+      return ctx.wallet.submitTransaction(tx) as any;
+    },
+  };
 }
 
-// ─── Contract deployment (local simulator) ──────────────────────────────────
+async function initSingleton(): Promise<void> {
+  if (_providers) return;
+
+  console.log("[midnight] Initializing real Midnight connection...");
+  console.log(`  Node:         ${NODE_URL}`);
+  console.log(`  Indexer:      ${INDEXER_URL}`);
+  console.log(`  Proof Server: ${PROOF_SERVER_URL}`);
+  console.log(`  ZK Config:    ${ZK_CONFIG_PATH}`);
+
+  const networkId = getNetworkId();
+
+  // Derive keys from genesis seed
+  const keys = deriveKeysFromSeed(GENESIS_SEED);
+  const shieldedSecretKeys = ledger.ZswapSecretKeys.fromSeed(keys[Roles.Zswap]);
+  const dustSecretKey = ledger.DustSecretKey.fromSeed(keys[Roles.Dust]);
+  const unshieldedKeystore = createKeystore(
+    keys[Roles.NightExternal],
+    networkId
+  );
+
+  // Build wallet
+  const wallet = await WalletFacade.init({
+    configuration: {
+      networkId,
+      indexerClientConnection: {
+        indexerHttpUrl: INDEXER_URL,
+        indexerWsUrl: INDEXER_WS_URL,
+      },
+      provingServerUrl: new URL(PROOF_SERVER_URL),
+      relayURL: new URL(NODE_URL.replace(/^http/, "ws")),
+      txHistoryStorage: new InMemoryTransactionHistoryStorage(),
+      costParameters: {
+        additionalFeeOverhead: 300_000_000_000_000n,
+        feeBlocksMargin: 5,
+      },
+    },
+    shielded: (cfg) =>
+      ShieldedWallet(cfg).startWithSecretKeys(shieldedSecretKeys),
+    unshielded: (cfg) =>
+      UnshieldedWallet({
+        networkId: cfg.networkId,
+        indexerClientConnection: cfg.indexerClientConnection,
+        txHistoryStorage: cfg.txHistoryStorage,
+      }).startWithPublicKey(PublicKey.fromKeyStore(unshieldedKeystore)),
+    dust: (cfg) =>
+      DustWallet({
+        networkId: cfg.networkId,
+        costParameters: cfg.costParameters,
+        indexerClientConnection: cfg.indexerClientConnection,
+        provingServerUrl: cfg.provingServerUrl,
+        relayURL: cfg.relayURL,
+      }).startWithSecretKey(
+        dustSecretKey,
+        ledger.LedgerParameters.initialParameters().dust
+      ),
+  });
+
+  await wallet.start(shieldedSecretKeys, dustSecretKey);
+
+  // Wait for sync
+  console.log("[midnight] Waiting for wallet sync...");
+  await Rx.firstValueFrom(
+    wallet
+      .state()
+      .pipe(
+        Rx.throttleTime(5_000),
+        Rx.filter((s) => s.isSynced)
+      )
+  );
+
+  // Check balance
+  const syncedState = await Rx.firstValueFrom(
+    wallet.state().pipe(Rx.filter((s) => s.isSynced))
+  );
+  const balance =
+    syncedState.unshielded.balances[unshieldedToken().raw] ?? 0n;
+  console.log(`[midnight] Wallet synced. Balance: ${balance} tNight`);
+
+  // Register for dust generation if needed
+  if (syncedState.dust.availableCoins.length === 0) {
+    const nightUtxos = syncedState.unshielded.availableCoins.filter(
+      (coin: any) => coin.meta?.registeredForDustGeneration !== true
+    );
+    if (nightUtxos.length > 0) {
+      console.log(
+        `[midnight] Registering ${nightUtxos.length} NIGHT UTXO(s) for dust generation...`
+      );
+      const recipe = await wallet.registerNightUtxosForDustGeneration(
+        nightUtxos,
+        unshieldedKeystore.getPublicKey(),
+        (payload) => unshieldedKeystore.signData(payload)
+      );
+      const finalized = await wallet.finalizeRecipe(recipe);
+      await wallet.submitTransaction(finalized);
+    }
+    console.log("[midnight] Waiting for dust tokens...");
+    await Rx.firstValueFrom(
+      wallet
+        .state()
+        .pipe(
+          Rx.throttleTime(5_000),
+          Rx.filter((s) => s.isSynced),
+          Rx.filter((s) => s.dust.balance(new Date()) > 0n)
+        )
+    );
+  }
+  console.log("[midnight] Dust tokens available.");
+
+  _walletCtx = { wallet, shieldedSecretKeys, dustSecretKey, unshieldedKeystore };
+  _global.__verdictWalletCtx = _walletCtx;
+
+  // Configure providers
+  const walletAndMidnightProvider =
+    await createWalletAndMidnightProvider(_walletCtx);
+  const zkConfigProvider = new NodeZkConfigProvider<VerdictCircuits>(
+    ZK_CONFIG_PATH
+  );
+
+  _providers = {
+    privateStateProvider: levelPrivateStateProvider<typeof PRIVATE_STATE_ID>({
+      privateStateStoreName: "verdict-private-state",
+      walletProvider: walletAndMidnightProvider,
+    }),
+    publicDataProvider: indexerPublicDataProvider(INDEXER_URL, INDEXER_WS_URL),
+    zkConfigProvider,
+    proofProvider: httpClientProofProvider(PROOF_SERVER_URL, zkConfigProvider),
+    walletProvider: walletAndMidnightProvider,
+    midnightProvider: walletAndMidnightProvider,
+  };
+
+  _global.__verdictProviders = _providers;
+
+  console.log("[midnight] Providers configured. Ready for deployments.");
+}
+
+export async function ensureInitialized() {
+  // Re-read from globalThis in case module was re-evaluated
+  _walletCtx = _global.__verdictWalletCtx;
+  _providers = _global.__verdictProviders;
+  _initPromise = _global.__verdictInitPromise;
+
+  if (!_initPromise) {
+    _initPromise = initSingleton().catch((err) => {
+      _initPromise = null;
+      _global.__verdictInitPromise = null;
+      throw err;
+    });
+    _global.__verdictInitPromise = _initPromise;
+  }
+  await _initPromise;
+  return { providers: _providers!, walletCtx: _walletCtx! };
+}
+
+// ─── Contract deployment (real network) ─────────────────────────────────────
 
 export async function deployVerdictContract(meta: {
   name: string;
@@ -146,120 +441,73 @@ export async function deployVerdictContract(meta: {
   description: string;
   compact: string;
 }): Promise<DeployedRuleset> {
-  const contract = new Verdict.Contract<VerdictPrivateState>(witnesses);
-  const state = { ...defaultPrivateState };
+  const { providers } = await ensureInitialized();
 
-  // Initialize contract (constructor)
-  const { currentPrivateState, currentContractState, currentZswapLocalState } =
-    contract.initialState(
-      createConstructorContext(state, "0".repeat(64))
-    );
+  console.log(`[midnight] Deploying "${meta.name}"...`);
+  const contract = await deployContract(providers, {
+    compiledContract: verdictCompiledContract,
+    privateStateId: PRIVATE_STATE_ID,
+    initialPrivateState: defaultPrivateState,
+  });
 
-  let circuitContext = createCircuitContext(
-    sampleContractAddress(),
-    currentZswapLocalState,
-    currentContractState,
-    currentPrivateState
-  );
+  const contractAddress = contract.deployTxData.public.contractAddress;
+  const txHash = contract.deployTxData.public.txHash ?? contractAddress;
 
-  // Run startSession
-  const sessionResult = contract.impureCircuits.startSession(
-    circuitContext,
-    new Uint8Array(32)
-  );
-  circuitContext = sessionResult.context;
-
-  // Compute commitment using contract internals
-  const contractHelper = new Verdict.Contract(witnesses);
-  let commitment: Uint8Array;
-  try {
-    commitment = (contractHelper as any)._persistentCommit_0(
-      [state.prevPos[0], state.prevPos[1], state.currPos[0], state.currPos[1], state.action],
-      state.nonce
-    );
-  } catch {
-    commitment = new Uint8Array(32);
-  }
-
-  // Run commitMove
-  const commitResult = contract.impureCircuits.commitMove(circuitContext, commitment);
-  circuitContext = commitResult.context;
-
-  // Compute enemy hash
-  let enemyHash: Uint8Array;
-  try {
-    enemyHash = (contractHelper as any)._persistentHash_1(state.enemyPositions);
-  } catch {
-    enemyHash = new Uint8Array(32);
-  }
-
-  // Run verifyTransition (the real 10-check circuit!)
-  const verifyResult = contract.impureCircuits.verifyTransition(
-    circuitContext,
-    RULES.maxVelocity, RULES.maxAcceleration, RULES.boundX, RULES.boundY,
-    RULES.validActionCount, RULES.maxActionsPerWindow, RULES.windowSize,
-    RULES.minDiversity, RULES.snapThreshold, RULES.maxSnaps, RULES.maxCorrelation,
-    enemyHash,
-  );
-  circuitContext = verifyResult.context;
-
-  const address = randomAddress();
-  const txHash = randomHex(32);
+  console.log(`[midnight] Deployed "${meta.name}" at ${contractAddress}`);
 
   const ruleset: DeployedRuleset = {
-    address,
+    address: contractAddress,
     name: meta.name,
     category: meta.category,
     description: meta.description,
     deployedAt: new Date().toISOString(),
-    txHash,
+    txHash: typeof txHash === "string" ? txHash : contractAddress,
     compact: meta.compact,
   };
 
-  // Read ledger state from circuit context
-  const ledgerState = Verdict.ledger(circuitContext.currentQueryContext.state);
-  const totalChecks = Number(ledgerState.totalChecks ?? 0n);
-  const totalFlagged = Number(ledgerState.totalFlagged ?? 0n);
-  const lastVerdict = verifyResult.result ?? 0;
-
-  deployedRulesets.set(address, {
-    ruleset,
-    contract,
-    circuitContext,
-    totalChecks,
-    totalFlagged,
-    lastVerdict: typeof lastVerdict === "number" ? lastVerdict : 0,
-  });
-
-  console.log(
-    `[simulator] Deployed "${meta.name}" at ${address.slice(0, 16)}... — verdict=${lastVerdict}, checks=${totalChecks}, flagged=${totalFlagged}`
-  );
-
+  rulesetRegistry.set(contractAddress, { ruleset });
   saveStore();
   return ruleset;
 }
 
-// ─── Ledger queries ─────────────────────────────────────────────────────────
+// ─── Ledger queries (real on-chain) ─────────────────────────────────────────
 
 export async function getContractState(contractAddress: string) {
-  const entry = deployedRulesets.get(contractAddress);
-  if (!entry) return null;
-  return {
-    totalChecks: BigInt(entry.totalChecks),
-    totalFlagged: BigInt(entry.totalFlagged),
-    lastVerdict: BigInt(entry.lastVerdict),
-  };
+  const { providers } = await ensureInitialized();
+
+  try {
+    assertIsContractAddress(contractAddress);
+    const contractState =
+      await providers.publicDataProvider.queryContractState(
+        contractAddress as ContractAddress
+      );
+    if (!contractState) return null;
+    const state = Verdict.ledger(contractState.data);
+    return {
+      totalChecks: BigInt(state.totalChecks ?? 0),
+      totalFlagged: BigInt(state.totalFlagged ?? 0),
+      lastVerdict: BigInt(Number(state.lastVerdict ?? 0)),
+      sessionActive: Boolean(state.sessionActive ?? false),
+    };
+  } catch (err) {
+    // If the contract address isn't a real on-chain address, return null
+    console.error(
+      `[midnight] Failed to query state for ${contractAddress}:`,
+      err
+    );
+    return null;
+  }
 }
 
 export function getDeployedRulesets(): DeployedRuleset[] {
-  return Array.from(deployedRulesets.values()).map((e) => e.ruleset);
+  return Array.from(rulesetRegistry.values()).map((e) => e.ruleset);
 }
 
 export function getRuleset(address: string): DeployedRuleset | undefined {
-  return deployedRulesets.get(address)?.ruleset;
+  return rulesetRegistry.get(address)?.ruleset;
 }
 
-// ─── Network status (simulated — all healthy) ──────────────────────────────
+// ─── Network status (real health checks) ────────────────────────────────────
 
 export async function getNetworkStatus(): Promise<{
   nodeHealthy: boolean;
@@ -267,354 +515,83 @@ export async function getNetworkStatus(): Promise<{
   proofServerHealthy: boolean;
   blockHeight: number | null;
 }> {
-  return {
-    nodeHealthy: true,
-    indexerHealthy: true,
-    proofServerHealthy: true,
-    blockHeight,
-  };
+  const results = await Promise.allSettled([
+    fetch(`${NODE_URL}/health`, { signal: AbortSignal.timeout(5000) }).then(
+      (r) => r.ok
+    ),
+    fetch(INDEXER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: "{ __typename }" }),
+      signal: AbortSignal.timeout(5000),
+    }).then((r) => r.ok),
+    fetch(`${PROOF_SERVER_URL}/version`, {
+      signal: AbortSignal.timeout(5000),
+    }).then((r) => r.ok),
+  ]);
+
+  const nodeHealthy =
+    results[0].status === "fulfilled" && results[0].value === true;
+  const indexerHealthy =
+    results[1].status === "fulfilled" && results[1].value === true;
+  const proofServerHealthy =
+    results[2].status === "fulfilled" && results[2].value === true;
+
+  let blockHeight: number | null = null;
+  if (indexerHealthy) {
+    try {
+      const res = await fetch(INDEXER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: "{ block { height } }",
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+      const data = await res.json();
+      blockHeight = data?.data?.block?.height ?? null;
+    } catch {}
+  }
+
+  return { nodeHealthy, indexerHealthy, proofServerHealthy, blockHeight };
 }
 
-// ─── Wallet info (simulated) ────────────────────────────────────────────────
+// ─── Wallet info (real) ─────────────────────────────────────────────────────
 
 export async function getWalletInfo() {
-  return {
-    address: "midnight1_sim_" + randomHex(16),
-    balance: "1000000000000000",
-    isSynced: true,
-  };
+  try {
+    const { walletCtx } = await ensureInitialized();
+    const state = await Rx.firstValueFrom(
+      walletCtx.wallet.state().pipe(Rx.filter((s) => s.isSynced))
+    );
+    const balance =
+      state.unshielded.balances[unshieldedToken().raw] ?? 0n;
+    return {
+      address: walletCtx.unshieldedKeystore.getBech32Address(),
+      balance: balance.toString(),
+      isSynced: true,
+    };
+  } catch (err) {
+    return {
+      address: null,
+      balance: "0",
+      isSynced: false,
+    };
+  }
 }
 
-// ─── No initialization needed ───────────────────────────────────────────────
-
-export async function ensureInitialized() {
-  // No-op in simulator mode — everything is local
-  return { providers: null as any, walletCtx: null as any };
-}
-
-// ─── Seed rulesets (auto-populate on startup) ───────────────────────────────
-
-const SEED_RULESETS: Array<{
-  name: string;
-  category: string;
-  description: string;
-  compact: string;
-  totalChecks: number;
-  totalFlagged: number;
-  lastVerdict: number;
-  deployedAt: string;
-}> = [
-  {
-    name: "Valorant Anti-Cheat Module",
-    category: "fps",
-    description:
-      "Full 10-check integrity circuit for tactical FPS. Covers aimbot snap detection, wallhack correlation analysis, speed hacks, teleport exploits, and scripted bot loops. Tuned for 128-tick servers.",
-    compact: `pragma language_version >= 0.20;
-
-import CompactStandardLibrary;
-
-enum Verdict { clean, flagged }
-
-// === LEDGER STATE ===
-export ledger totalChecks: Counter;
-export ledger totalFlagged: Counter;
-export ledger lastVerdict: Verdict;
-export ledger commitment: Bytes<32>;
-export ledger lastChainHash: Bytes<32>;
-export ledger sessionActive: Boolean;
-
-// === WITNESSES (private inputs) ===
-witness getPrevPrevPos(): Vector<2, Uint<64>>;
-witness getPrevPos(): Vector<2, Uint<64>>;
-witness getCurrPos(): Vector<2, Uint<64>>;
-witness getAction(): Uint<64>;
-witness getIsFirstMove(): Uint<64>;
-witness getPrevHash(): Bytes<32>;
-witness getNonce(): Bytes<32>;
-witness getAimHistory(): Vector<16, Uint<64>>;
-witness getActionHistory(): Vector<8, Uint<64>>;
-witness getTickHistory(): Vector<8, Uint<64>>;
-witness getCurrentTick(): Uint<64>;
-witness getEnemyPositions(): Vector<16, Uint<64>>;
-
-// CHECK 1: Hash-chain integrity
-// CHECK 2: Commit-reveal verification
-// CHECK 3: Velocity bounds (speed hack)
-// CHECK 4: Acceleration bounds (speed ramp)
-// CHECK 5: Spatial bounds (noclip/OOB)
-// CHECK 6: Action validity
-// CHECK 7: Action frequency (autoclicker)
-// CHECK 8: Behavioral entropy (bot detection)
-// CHECK 9: Aim precision anomaly (aimbot)
-// CHECK 10: Information leakage (wallhack/ESP)
-
-export circuit verifyTransition(
-  maxVelocity: Uint<64>, maxAcceleration: Uint<64>,
-  boundX: Uint<64>, boundY: Uint<64>,
-  validActionCount: Uint<64>, maxActionsPerWindow: Uint<64>,
-  windowSize: Uint<64>, minDiversity: Uint<64>,
-  snapThreshold: Uint<64>, maxSnaps: Uint<64>,
-  maxCorrelation: Uint<64>, enemyPosHashPublic: Bytes<32>
-): Verdict {
-  // ... 10 checks execute in ZK ...
-  // Returns: Verdict.clean or Verdict.flagged
-}`,
-    totalChecks: 14_832,
-    totalFlagged: 247,
-    lastVerdict: 0,
-    deployedAt: "2026-03-15T09:12:00.000Z",
-  },
-  {
-    name: "Texas Hold'em Fairness",
-    category: "card-game",
-    description:
-      "Verifies poker hand integrity without revealing cards. Proves deck shuffle commitment, validates bet sequences against hand state, detects collusion patterns between seat positions.",
-    compact: `pragma language_version >= 0.20;
-
-import CompactStandardLibrary;
-
-enum Verdict { clean, flagged }
-
-export ledger totalChecks: Counter;
-export ledger totalFlagged: Counter;
-export ledger lastVerdict: Verdict;
-export ledger deckCommitment: Bytes<32>;
-
-witness getHandCards(): Vector<4, Uint<64>>;
-witness getCommunityCards(): Vector<10, Uint<64>>;
-witness getBetHistory(): Vector<8, Uint<64>>;
-witness getShuffleNonce(): Bytes<32>;
-witness getSeatPosition(): Uint<64>;
-
-// CHECK 1: Deck commitment integrity (shuffle was pre-committed)
-// CHECK 2: Card uniqueness (no duplicate cards in play)
-// CHECK 3: Bet sequence validity (raises follow rules)
-// CHECK 4: Hand-bet correlation (detect impossible bluffs)
-// CHECK 5: Timing analysis (detect bot-speed decisions)
-// CHECK 6: Collusion pattern detection (cross-seat correlation)
-
-export circuit verifyHand(
-  minBet: Uint<64>, maxRaise: Uint<64>,
-  deckHashPublic: Bytes<32>, tableSize: Uint<64>
-): Verdict {
-  // ... checks execute in ZK ...
-}`,
-    totalChecks: 52_410,
-    totalFlagged: 891,
-    lastVerdict: 0,
-    deployedAt: "2026-03-12T14:30:00.000Z",
-  },
-  {
-    name: "MMO Economy Validator",
-    category: "mmorpg",
-    description:
-      "Prevents item duplication, gold exploits, and trade fraud in persistent game worlds. Validates inventory state transitions, crafting recipes, and marketplace listings against committed world state.",
-    compact: `pragma language_version >= 0.20;
-
-import CompactStandardLibrary;
-
-enum Verdict { clean, flagged }
-
-export ledger totalChecks: Counter;
-export ledger totalFlagged: Counter;
-export ledger lastVerdict: Verdict;
-export ledger inventoryRoot: Bytes<32>;
-
-witness getItemsBefore(): Vector<16, Uint<64>>;
-witness getItemsAfter(): Vector<16, Uint<64>>;
-witness getGoldBefore(): Uint<64>;
-witness getGoldAfter(): Uint<64>;
-witness getTradePartner(): Uint<64>;
-witness getCraftingRecipe(): Vector<8, Uint<64>>;
-
-// CHECK 1: Conservation of value (items in = items out)
-// CHECK 2: Inventory hash-chain (no item duplication)
-// CHECK 3: Gold balance integrity (no generation exploits)
-// CHECK 4: Crafting recipe validity (inputs match recipe DB)
-// CHECK 5: Trade fairness (both sides committed before reveal)
-// CHECK 6: Rate limiting (max trades per window)
-// CHECK 7: Item rarity bounds (legendary drop rate enforcement)
-
-export circuit verifyTransaction(
-  maxTradesPerWindow: Uint<64>, windowSize: Uint<64>,
-  worldStateHash: Bytes<32>
-): Verdict {
-  // ... checks execute in ZK ...
-}`,
-    totalChecks: 203_847,
-    totalFlagged: 1_203,
-    lastVerdict: 0,
-    deployedAt: "2026-03-10T22:05:00.000Z",
-  },
-  {
-    name: "Chess Move Integrity",
-    category: "turn-based",
-    description:
-      "Proves legal move sequences without revealing strategy. Validates piece movement rules, check/checkmate detection, en passant timing, and castling eligibility against committed board state.",
-    compact: `pragma language_version >= 0.20;
-
-import CompactStandardLibrary;
-
-enum Verdict { clean, flagged }
-
-export ledger totalChecks: Counter;
-export ledger totalFlagged: Counter;
-export ledger lastVerdict: Verdict;
-export ledger boardCommitment: Bytes<32>;
-
-witness getBoardState(): Vector<64, Uint<64>>;
-witness getMove(): Vector<4, Uint<64>>;
-witness getMoveNumber(): Uint<64>;
-witness getCastlingRights(): Vector<4, Uint<64>>;
-witness getEnPassantSquare(): Uint<64>;
-
-// CHECK 1: Board state hash-chain (position integrity)
-// CHECK 2: Piece movement legality (per piece type rules)
-// CHECK 3: King safety (not moving into check)
-// CHECK 4: Turn order enforcement (alternating colors)
-// CHECK 5: Castling eligibility (king/rook unmoved)
-// CHECK 6: En passant timing (only on immediate response)
-// CHECK 7: Time control compliance (move within clock)
-
-export circuit verifyMove(
-  boardHashPublic: Bytes<32>,
-  timeLimit: Uint<64>
-): Verdict {
-  // ... checks execute in ZK ...
-}`,
-    totalChecks: 8_291,
-    totalFlagged: 12,
-    lastVerdict: 0,
-    deployedAt: "2026-03-18T16:45:00.000Z",
-  },
-  {
-    name: "Battle Royale Zone Enforcer",
-    category: "fps",
-    description:
-      "Enforces zone boundaries, loot spawn fairness, and elimination validity in battle royale games. Prevents zone-phasing, loot table manipulation, and damage calculation exploits.",
-    compact: `pragma language_version >= 0.20;
-
-import CompactStandardLibrary;
-
-enum Verdict { clean, flagged }
-
-export ledger totalChecks: Counter;
-export ledger totalFlagged: Counter;
-export ledger lastVerdict: Verdict;
-export ledger zoneCommitment: Bytes<32>;
-
-witness getPlayerPos(): Vector<2, Uint<64>>;
-witness getZoneCenter(): Vector<2, Uint<64>>;
-witness getZoneRadius(): Uint<64>;
-witness getHealthBefore(): Uint<64>;
-witness getHealthAfter(): Uint<64>;
-witness getDamageEvents(): Vector<8, Uint<64>>;
-witness getLootPickups(): Vector<8, Uint<64>>;
-
-// CHECK 1: Zone boundary compliance (player inside ring)
-// CHECK 2: Zone damage application (correct tick damage outside)
-// CHECK 3: Loot spawn validity (items from committed loot table)
-// CHECK 4: Damage calculation integrity (weapon stats match)
-// CHECK 5: Health conservation (no regeneration exploits)
-// CHECK 6: Movement speed in zone transition
-// CHECK 7: Elimination validity (kill confirmed by damage log)
-
-export circuit verifyTick(
-  zoneHashPublic: Bytes<32>,
-  maxSpeed: Uint<64>, tickDamage: Uint<64>
-): Verdict {
-  // ... checks execute in ZK ...
-}`,
-    totalChecks: 31_205,
-    totalFlagged: 524,
-    lastVerdict: 0,
-    deployedAt: "2026-03-14T11:20:00.000Z",
-  },
-  {
-    name: "Slot Machine RNG Prover",
-    category: "casino",
-    description:
-      "Proves slot machine outcomes derive from pre-committed RNG seeds. Players verify the house didn't manipulate results post-bet. Covers multi-line slots, bonus triggers, and progressive jackpots.",
-    compact: `pragma language_version >= 0.20;
-
-import CompactStandardLibrary;
-
-enum Verdict { clean, flagged }
-
-export ledger totalChecks: Counter;
-export ledger totalFlagged: Counter;
-export ledger lastVerdict: Verdict;
-export ledger seedCommitment: Bytes<32>;
-
-witness getSeed(): Bytes<32>;
-witness getBetAmount(): Uint<64>;
-witness getReelResults(): Vector<15, Uint<64>>;
-witness getPayoutClaimed(): Uint<64>;
-witness getBonusTriggered(): Uint<64>;
-
-// CHECK 1: RNG seed was committed before bet placed
-// CHECK 2: Reel results derive deterministically from seed
-// CHECK 3: Payout matches paytable for given reel combination
-// CHECK 4: Bonus trigger conditions verified against reels
-// CHECK 5: Progressive jackpot contribution calculated correctly
-// CHECK 6: Bet amount within table limits
-
-export circuit verifySpin(
-  seedHashPublic: Bytes<32>,
-  minBet: Uint<64>, maxBet: Uint<64>,
-  paytableHash: Bytes<32>
-): Verdict {
-  // ... checks execute in ZK ...
-}`,
-    totalChecks: 127_003,
-    totalFlagged: 0,
-    lastVerdict: 0,
-    deployedAt: "2026-03-11T08:00:00.000Z",
-  },
-];
-
-// ─── Startup: load persisted state, seed if empty ───────────────────────────
+// ─── Startup: load persisted metadata ───────────────────────────────────────
 
 function initStore() {
   const persisted = loadStore();
+  for (const entry of persisted) {
+    rulesetRegistry.set(entry.ruleset.address, { ruleset: entry.ruleset });
+  }
   if (persisted.length > 0) {
-    for (const entry of persisted) {
-      deployedRulesets.set(entry.ruleset.address, {
-        ruleset: entry.ruleset,
-        contract: null as any,
-        circuitContext: null as any,
-        totalChecks: entry.totalChecks,
-        totalFlagged: entry.totalFlagged,
-        lastVerdict: entry.lastVerdict,
-      });
-    }
-    console.log(`[simulator] Loaded ${persisted.length} rulesets from disk`);
-    return;
+    console.log(
+      `[midnight] Loaded ${persisted.length} ruleset(s) from metadata store`
+    );
   }
-
-  // First run — seed defaults
-  for (const seed of SEED_RULESETS) {
-    const address = randomAddress();
-    const entry: SimulatorEntry = {
-      ruleset: {
-        address,
-        name: seed.name,
-        category: seed.category,
-        description: seed.description,
-        deployedAt: seed.deployedAt,
-        txHash: randomHex(32),
-        compact: seed.compact,
-      },
-      contract: null as any,
-      circuitContext: null as any,
-      totalChecks: seed.totalChecks,
-      totalFlagged: seed.totalFlagged,
-      lastVerdict: seed.lastVerdict,
-    };
-    deployedRulesets.set(address, entry);
-    console.log(`[simulator] Seeded "${seed.name}" (${seed.totalChecks} checks)`);
-  }
-  saveStore();
 }
 
 initStore();

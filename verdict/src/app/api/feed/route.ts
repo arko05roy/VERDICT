@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getDeployedRulesets, getContractState } from "../../../lib/midnight";
 
-const INDEXER_URL = "http://127.0.0.1:8088/api/v3/graphql";
+const INDEXER_URL =
+  process.env.MIDNIGHT_INDEXER_URL || "http://127.0.0.1:8088/api/v3/graphql";
 
 async function getLatestBlock(): Promise<{
   height: number;

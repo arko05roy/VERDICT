@@ -1,0 +1,5 @@
+2026/03/27-21:38:02.086583 16ecab000 Recovering log #6
+2026/03/27-21:38:02.086608 16ecab000 Level-0 table #8: started
+2026/03/27-21:38:02.086797 16ecab000 Level-0 table #8: 4527 bytes OK
+2026/03/27-21:38:02.087113 16ecab000 Delete type=0 #6
+2026/03/27-21:38:02.087151 16ecab000 Delete type=3 #4
