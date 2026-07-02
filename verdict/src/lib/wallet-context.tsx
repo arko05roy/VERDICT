@@ -97,9 +97,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       }
       setConnectedApi(api);
 
-      // Fetch address
+      // Fetch address — always use the shielded (m_shielded) address
       const addresses = await api.getShieldedAddresses();
-      const addr = addresses.shieldedAddress ?? null;
+      console.log("[VERDICT] getShieldedAddresses response:", JSON.stringify(addresses));
+      const addr =
+        (addresses as any).m_shielded_address ??
+        addresses.shieldedAddress ??
+        (typeof addresses === "string" ? addresses : null);
       setAddress(addr);
 
       // Fetch balance
