@@ -180,27 +180,33 @@ The simulator runs the full ZK circuit in-memory with pre-seeded example ruleset
 
 ---
 
-## Contract Address
+## Contract Address (Preprod)
 
 | Contract | Network | Address |
 |----------|---------|---------|
-| **VERDICT** (`verdict.compact`) | **Preprod** | Set `NEXT_PUBLIC_VERDICT_PREPROD_CONTRACT_ADDRESS` after deploy |
+| **VERDICT** (`verdict.compact`) | **Preprod** | _Deploy below, then paste address here_ |
 
-### Deploy to Preprod
+### One-time deploy (requires funded wallet)
 
 ```bash
-# 1. Fund wallet at https://faucet.preprod.midnight.network/
 cd counter-cli
 SEED=<your-funded-hex-seed> npm run deploy:preprod
-
-# 2. Copy printed address into verdict/.env.local
-NEXT_PUBLIC_VERDICT_PREPROD_CONTRACT_ADDRESS=<address>
-
-# 3. Full circuit round-trip test (CLI)
-SEED=<seed> npx tsx src/roundtrip.ts
 ```
 
-Verify on explorer: `https://explorer.preprod.midnight.network/contract/<address>`
+The script prints `NEXT_PUBLIC_VERDICT_PREPROD_CONTRACT_ADDRESS` and `MIDNIGHT_WALLET_SEED`.
+
+**Add both to [Vercel → verdict-jade → Settings → Environment Variables](https://vercel.com):**
+
+| Variable | Value |
+|----------|-------|
+| `NEXT_PUBLIC_VERDICT_PREPROD_CONTRACT_ADDRESS` | contract address from deploy output |
+| `MIDNIGHT_WALLET_SEED` | seed from deploy output (secret) |
+| `MIDNIGHT_NETWORK_ID` | `preprod` |
+| `MIDNIGHT_PROOF_SERVER_URL` | `https://lace-proof-pub.preprod.midnight.network` |
+
+Redeploy Vercel after adding env vars. Verify on [Preprod explorer](https://explorer.preprod.midnight.network).
+
+> **No funded seed?** Run `npm run deploy:preprod` without `SEED` — it prints a faucet address. Fund at [faucet.preprod.midnight.network](https://faucet.preprod.midnight.network/), then re-run with the printed seed.
 
 ---
 
@@ -278,7 +284,7 @@ npm test   # 42 tests (1 root + 10 verdict + 28 DAO + 3 files)
 | Lace connect/disconnect | ✅ Sidebar wallet |
 | Circuit from frontend | ✅ `verdict-client.ts` via Lace |
 | Privacy behavior | ✅ Witness hidden, verdict public |
-| Preprod contract | ⚙️ Deploy with `deploy:preprod` |
+| Preprod contract | ⚙️ Run `deploy:preprod` + Vercel env vars (see README) |
 | 8+ commits | ✅ |
 | 3+ tests | ✅ 42 passing |
 | CI/CD | ✅ `.github/workflows/ci.yml` |

@@ -66,7 +66,9 @@ const INDEXER_WS_URL =
 const PROOF_SERVER_URL =
   process.env.MIDNIGHT_PROOF_SERVER_URL || "http://127.0.0.1:6300";
 
-const GENESIS_SEED =
+const WALLET_SEED =
+  process.env.MIDNIGHT_WALLET_SEED ||
+  process.env.SEED ||
   "0000000000000000000000000000000000000000000000000000000000000001";
 
 const ZK_CONFIG_PATH = path.resolve(
@@ -329,7 +331,7 @@ async function initSingleton(): Promise<void> {
   const networkId = getNetworkId();
 
   // Derive keys from genesis seed
-  const keys = deriveKeysFromSeed(GENESIS_SEED);
+  const keys = deriveKeysFromSeed(WALLET_SEED);
   const shieldedSecretKeys = ledger.ZswapSecretKeys.fromSeed(keys[Roles.Zswap]);
   const dustSecretKey = ledger.DustSecretKey.fromSeed(keys[Roles.Dust]);
   const unshieldedKeystore = createKeystore(
