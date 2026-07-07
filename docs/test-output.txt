@@ -1,0 +1,56 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+
+> example-counter@2.0.2 test
+> vitest run --config vitest.config.ts && cd contract && npm test
+
+
+ RUN  v4.1.0 /Users/arkoroy/Desktop/VDERDICT/VERDICT
+
+Sourcemap for "/Users/arkoroy/Desktop/VDERDICT/VERDICT/contract/src/managed/verdict/contract/index.js" points to missing source files
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  21:08:22
+   Duration  158ms (transform 42ms, setup 0ms, import 62ms, tests 22ms, environment 0ms)
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+
+> @midnight-ntwrk/verdict-contract@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.0 /Users/arkoroy/Desktop/VDERDICT/VERDICT/contract
+
+Sourcemap for "/Users/arkoroy/Desktop/VDERDICT/VERDICT/contract/src/managed/verdict/contract/index.js" points to missing source files
+Sourcemap for "/Users/arkoroy/Desktop/VDERDICT/VERDICT/contract/src/managed/verdict-dao/contract/index.js" points to missing source files
+ ✓ src/test/counter.test.ts (3 tests) 30ms
+stdout | src/test/verdict.test.ts > VERDICT 10-check circuit > CLEAN move → verdict = clean (0), totalFlagged = 0
+CLEAN: { verdict: 0, totalChecks: 1n, totalFlagged: 0n }
+
+stdout | src/test/verdict.test.ts > VERDICT 10-check circuit > CHECK 3: TELEPORT → flagged (velocity = 1590 > 100)
+TELEPORT: { verdict: 1, totalFlagged: 1n }
+
+stdout | src/test/verdict.test.ts > VERDICT 10-check circuit > CHECK 5: OUT OF BOUNDS → flagged (x = 1001 > 1000)
+OOB: { verdict: 1, totalFlagged: 1n }
+
+stdout | src/test/verdict.test.ts > VERDICT 10-check circuit > CHECK 6: INVALID ACTION → flagged (action = 99 >= 4)
+INVALID ACTION: { verdict: 1, totalFlagged: 1n }
+
+stdout | src/test/verdict.test.ts > VERDICT 10-check circuit > CHECK 8: BOT → flagged (all same actions, diversity = 0)
+BOT: { verdict: 1, totalFlagged: 1n }
+
+stdout | src/test/verdict.test.ts > VERDICT 10-check circuit > CHECK 4: SPEED RAMP → flagged (accel = 90 > 50)
+SPEED RAMP: { verdict: 1, totalFlagged: 1n }
+
+stdout | src/test/verdict.test.ts > VERDICT 10-check circuit > totalChecks increments on each verifyTransition call
+After 1 verify: totalChecks = 1n
+
+ ✓ src/test/verdict.test.ts (10 tests) 140ms
+ ✓ src/test/verdict-dao.test.ts (28 tests) 637ms
+
+ Test Files  3 passed (3)
+      Tests  41 passed (41)
+   Start at  21:08:23
+   Duration  821ms (transform 202ms, setup 0ms, import 311ms, tests 808ms, environment 0ms)
+
+JUNIT report written to /Users/arkoroy/Desktop/VDERDICT/VERDICT/contract/reports/report.xml

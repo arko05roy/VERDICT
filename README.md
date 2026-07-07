@@ -184,9 +184,123 @@ The simulator runs the full ZK circuit in-memory with pre-seeded example ruleset
 
 | Contract | Network | Address |
 |----------|---------|---------|
-| **VERDICT** (`verdict.compact`) | Undeployed (local standalone) | `b9184c39f154e1284f17f53dcbb15a20361a2b159c9bf7b4118d7d958f674e99` |
+| **VERDICT** (`verdict.compact`) | **Preprod** | Set `NEXT_PUBLIC_VERDICT_PREPROD_CONTRACT_ADDRESS` after deploy |
 
-Deployed via the local Midnight stack (`counter-cli/standalone.yml`). To deploy on **Preprod**, run `cd counter-cli && npm run preprod-ps` and save the address printed after deployment.
+### Deploy to Preprod
+
+```bash
+# 1. Fund wallet at https://faucet.preprod.midnight.network/
+cd counter-cli
+SEED=<your-funded-hex-seed> npm run deploy:preprod
+
+# 2. Copy printed address into verdict/.env.local
+NEXT_PUBLIC_VERDICT_PREPROD_CONTRACT_ADDRESS=<address>
+
+# 3. Full circuit round-trip test (CLI)
+SEED=<seed> npx tsx src/roundtrip.ts
+```
+
+Verify on explorer: `https://explorer.preprod.midnight.network/contract/<address>`
+
+---
+
+## Live Demo
+
+Deploy the frontend to Vercel:
+
+```bash
+cd verdict && vercel --prod
+```
+
+Set environment variables from `verdict/.env.example`. The dashboard connects to Lace on Preprod and calls `verifyTransition` from the browser.
+
+[![CI](https://github.com/arko05roy/VERDICT/actions/workflows/ci.yml/badge.svg)](https://github.com/arko05roy/VERDICT/actions/workflows/ci.yml)
+
+---
+
+## Privacy Claim
+
+VERDICT proves rule compliance **without revealing participant data**.
+
+- **Private (never on-chain):** player positions, enemy coordinates, aim history, action sequences, nonces
+- **Public (on-chain):** `CLEAN` / `FLAGGED` verdict, `totalChecks` / `totalFlagged` counters
+- **Observable behavior:** Connect Lace → Run Verification on a ruleset → verdict appears on-chain while witness data stays in the browser
+
+The circuit hashes hidden state inside the ZK proof. Observers verify *that* rules were followed, not *what* the data was.
+
+---
+
+## Privacy Model
+
+What an observer **can** learn from the chain:
+
+| Observable | Example |
+|------------|---------|
+| Verdict outcome | `CLEAN` or `FLAGGED` |
+| Aggregate counters | `totalChecks`, `totalFlagged` |
+| Contract address | Ruleset identity |
+| Transaction IDs | Proof was submitted |
+
+What an observer **cannot** learn:
+
+| Hidden | Why |
+|--------|-----|
+| Player position / movement | Private witness — only velocity *bounds* checked in-circuit |
+| Enemy positions | Hashed locally; circuit checks correlation without revealing coords |
+| Individual actions | Witness data discarded after proof |
+| Wallet identity link | Shielded addresses; selective disclosure only |
+
+See [product proposal](docs/product-proposal.md) — **Private Allowlist Access** mapped to VERDICT's integrity gates.
+
+---
+
+## Demo Video Checklist
+
+Record (~1 min):
+
+1. Open dashboard → Connect Lace (Preprod)
+2. Navigate to Explore → genesis ruleset
+3. Click **Run Verification** → wait for ZK proof
+4. Show `CLEAN` verdict + privacy panel (witness hidden)
+5. Optional: show contract on [Preprod explorer](https://explorer.preprod.midnight.network)
+
+Script reference: [`verdict/script.md`](verdict/script.md)
+
+---
+
+## Tests
+
+```bash
+npm test   # 42 tests (1 root + 10 verdict + 28 DAO + 3 files)
+```
+
+![Tests passing](docs/test-output.txt) — run `npm test` for live output (42 tests).
+
+---
+
+## Level 2 / Level 3 Submission
+
+| Requirement | Status |
+|-------------|--------|
+| Lace connect/disconnect | ✅ Sidebar wallet |
+| Circuit from frontend | ✅ `verdict-client.ts` via Lace |
+| Privacy behavior | ✅ Witness hidden, verdict public |
+| Preprod contract | ⚙️ Deploy with `deploy:preprod` |
+| 8+ commits | ✅ |
+| 3+ tests | ✅ 42 passing |
+| CI/CD | ✅ `.github/workflows/ci.yml` |
+| Product proposal | ✅ `docs/product-proposal.md` |
+| Privacy model README | ✅ Above |
+
+---
+
+## Contract Address (local dev)
+
+| Contract | Network | Address |
+|----------|---------|---------|
+| **VERDICT** (`verdict.compact`) | Local standalone | `b9184c39f154e1284f17f53dcbb15a20361a2b159c9bf7b4118d7d958f674e99` |
+
+Local deploy via `counter-cli/standalone.yml`. Preprod uses the deploy flow above.
 
 ---
 

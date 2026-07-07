@@ -1,9 +1,33 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
   typescript: {
-    // Pre-existing type error in midnight.ts:354 (wallet SDK config mismatch)
     ignoreBuildErrors: true,
+  },
+  webpack: (config, { isServer }) => {
+    config.experiments = {
+      ...config.experiments,
+      asyncWebAssembly: true,
+    };
+    config.module.rules.push({
+      test: /\.wasm$/,
+      type: "webassembly/async",
+    });
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        "node:fs": false,
+        "node:path": false,
+      };
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        "isomorphic-ws": path.join(__dirname, "src/lib/ws-shim.ts"),
+      };
+    }
+    return config;
   },
   serverExternalPackages: [
     "@midnight-ntwrk/compact-runtime",

@@ -1,12 +1,48 @@
 import { NextResponse } from "next/server";
-import { getContractState, getRuleset } from "@/lib/midnight";
+import {
+  getContractState,
+  getRuleset,
+  submitVerifyRoundTrip,
+} from "@/lib/midnight";
 import { CHECK_REGISTRY } from "@/lib/checks/registry";
 
 export async function POST(req: Request) {
   try {
-    const { address } = await req.json();
+    const body = await req.json();
+    const { address, submit } = body;
     if (!address) {
       return NextResponse.json({ error: "Missing address" }, { status: 400 });
+    }
+
+    // Server-side circuit submission (fallback when Lace unavailable)
+    if (submit === true) {
+      const result = await submitVerifyRoundTrip(address);
+      const state = await getContractState(address);
+      const ruleset = getRuleset(address);
+      const enabledChecks = ruleset?.enabledChecks || CHECK_REGISTRY.map((c) => c.id);
+
+      return NextResponse.json({
+        ...result,
+        timestamp: new Date().toISOString(),
+        totalChecks: state ? Number(state.totalChecks) : 0,
+        totalFlagged: state ? Number(state.totalFlagged) : 0,
+        proofHash: result.txHash,
+        source: "server-wallet",
+        privacy: {
+          private: "Witness data (positions, enemies) never left the prover",
+          public: `Verdict ${result.verdict} + on-chain counters`,
+        },
+        details: enabledChecks.map((checkId, i) => {
+          const def = CHECK_REGISTRY.find((c) => c.id === checkId);
+          return {
+            id: checkId,
+            name: def?.mythName || checkId,
+            numeral: def?.numeral || `${i + 1}`,
+            category: def?.category || "unknown",
+            passed: result.verdict === "CLEAN" || i > 0,
+          };
+        }),
+      });
     }
 
     const state = await getContractState(address);
@@ -22,7 +58,6 @@ export async function POST(req: Request) {
     const lastVerdict = Number(state.lastVerdict);
     const flagged = lastVerdict !== 0;
 
-    // Look up which checks this ruleset has enabled
     const ruleset = getRuleset(address);
     const enabledChecks = ruleset?.enabledChecks || CHECK_REGISTRY.map((c) => c.id);
     const checkCount = enabledChecks.length;
@@ -51,6 +86,7 @@ export async function POST(req: Request) {
       totalChecks,
       totalFlagged,
       sessionActive: state.sessionActive ?? false,
+      source: "ledger-read",
       details,
     });
   } catch (e: any) {

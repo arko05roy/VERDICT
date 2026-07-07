@@ -1,0 +1,13 @@
+{
+  "buildCommand": "cd verdict && npm run build",
+  "outputDirectory": "verdict/.next",
+  "framework": "nextjs",
+  "installCommand": "npm ci && cd contract && npm run compact:all",
+  "env": {
+    "MIDNIGHT_NETWORK_ID": "preprod",
+    "MIDNIGHT_NODE_URL": "https://rpc.preprod.midnight.network",
+    "MIDNIGHT_INDEXER_URL": "https://indexer.preprod.midnight.network/api/v3/graphql",
+    "MIDNIGHT_INDEXER_WS_URL": "wss://indexer.preprod.midnight.network/api/v3/graphql/ws",
+    "MIDNIGHT_PROOF_SERVER_URL": "https://lace-proof-pub.preprod.midnight.network"
+  }
+}

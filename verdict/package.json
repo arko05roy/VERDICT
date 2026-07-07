@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
+    "build": "npm run copy-zk && next build --webpack",
+    "start": "next start",
+    "copy-zk": "mkdir -p public/zk/verdict && cp -R ../contract/src/managed/verdict/keys ../contract/src/managed/verdict/zkir public/zk/verdict/"
   },
   "dependencies": {
     "@midnight-ntwrk/compact-js": "^2.4.0",
@@ -26,6 +27,7 @@
     "@midnight-ntwrk/wallet-sdk-hd": "3.0.1",
     "@midnight-ntwrk/wallet-sdk-shielded": "2.0.0",
     "@midnight-ntwrk/wallet-sdk-unshielded-wallet": "2.0.0",
+    "@midnight-ntwrk/verdict-contract": "*",
     "next": "16.2.0",
     "pino": "^10.3.1",
     "react": "19.2.4",

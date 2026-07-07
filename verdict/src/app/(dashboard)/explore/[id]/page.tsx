@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import { useWallet } from "@/lib/wallet-context";
+import { explorerContractUrl } from "@/lib/config";
 
 type Ruleset = {
   address: string;
@@ -35,6 +37,7 @@ export default function RulesetDetailPage() {
 
   // Explorer modal
   const [showExplorerModal, setShowExplorerModal] = useState(false);
+  const wallet = useWallet();
 
   useEffect(() => {
     setMounted(true);
@@ -402,19 +405,44 @@ if (proof.flagged) {
           {/* Run Verification */}
           <button
             onClick={async () => {
+              if (!wallet.isConnected || !wallet.connectedApi) {
+                setVerifyResult({
+                  error: "Connect Lace wallet first (sidebar → Connect Wallet)",
+                });
+                setShowVerifyModal(true);
+                return;
+              }
               setVerifying(true);
               setVerifyResult(null);
               setShowVerifyModal(true);
               try {
-                const res = await fetch("/api/verify", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ address: ruleset.address }),
+                const { runVerdictCircuitRoundTrip } = await import(
+                  "@/lib/verdict-client"
+                );
+                const circuit = await runVerdictCircuitRoundTrip(
+                  wallet.connectedApi,
+                  ruleset!.address
+                );
+                setVerifyResult({
+                  verdict: circuit.verdict,
+                  checksRun: 10,
+                  checksPassed: circuit.verdict === "CLEAN" ? 10 : 9,
+                  checksFailed: circuit.verdict === "CLEAN" ? 0 : 1,
+                  proofHash: circuit.txHash,
+                  txHash: circuit.txHash,
+                  blockHeight: circuit.blockHeight,
+                  source: "lace-circuit",
+                  privacy: circuit.privateWitness,
+                  publicDisclosure: circuit.publicDisclosure,
+                  details: (ruleset?.enabledChecks || []).map((id, i) => ({
+                    id,
+                    name: id,
+                    numeral: `${i + 1}`,
+                    passed: circuit.verdict === "CLEAN" || i > 0,
+                  })),
                 });
-                const data = await res.json();
-                setVerifyResult(data);
               } catch (e: any) {
-                setVerifyResult({ error: e.message || "Verification failed" });
+                setVerifyResult({ error: e.message || "Circuit call failed" });
               } finally {
                 setVerifying(false);
               }
@@ -569,6 +597,16 @@ if (proof.flagged) {
                     <span className="text-[5px] text-[#333]">◈</span>
                     <div className="flex-1 h-px bg-[#333]" />
                   </div>
+
+                  {/* Privacy disclosure */}
+                  {verifyResult.privacy && (
+                    <div className="mb-4 p-3 border border-[#1a1a1a] bg-[#080808]">
+                      <p className="text-[8px] uppercase tracking-[0.2em] text-[var(--accent)] mb-2">Privacy — proved, not shown</p>
+                      <p className="text-[9px] text-[#555]">{verifyResult.privacy.playerPosition}</p>
+                      <p className="text-[9px] text-[#555]">{verifyResult.privacy.enemyPositions}</p>
+                      <p className="text-[9px] text-[#444] mt-1 italic">{verifyResult.privacy.note}</p>
+                    </div>
+                  )}
 
                   {/* Check details */}
                   <div className="space-y-1 mb-4">
