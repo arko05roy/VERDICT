@@ -5,7 +5,7 @@
  *   npm run deploy:preprod   # generates fresh wallet — fund at faucet, then re-run
  */
 import { createLogger } from './logger-utils.js';
-import { PreprodConfig } from './config.js';
+import { PreprodConfig, currentDir } from './config.js';
 import * as api from './api.js';
 import { toHex } from '@midnight-ntwrk/midnight-js-utils';
 import { generateRandomSeed } from '@midnight-ntwrk/wallet-sdk-hd';
@@ -21,8 +21,8 @@ const seed = process.env.SEED ?? toHex(Buffer.from(generateRandomSeed()));
 const outPath = path.resolve(currentDir, '..', 'logs', 'preprod-deploy.json');
 
 console.log('\n[deploy-only] Building wallet...');
-const walletCtx = await api.buildWalletAndWaitForFunds(config, seed);
-const providers = await api.configureProviders(walletCtx, config);
+const walletCtx = await api.buildWalletForPreprodDeploy(config, seed);
+const providers = api.configureDeployProviders(walletCtx, config);
 
 console.log('[deploy-only] Deploying verdict contract...');
 const contract = await api.deploy(providers);
