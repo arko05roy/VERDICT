@@ -362,13 +362,13 @@ export const buildWalletForPreprodDeploy = async (config: Config, seed: string):
             relayURL: cfg.relayURL,
           }).startWithSecretKey(dustSecretKey, ledger.LedgerParameters.initialParameters().dust),
       });
-      await Promise.all([
-        wallet.unshielded.start(),
-        wallet.dust.start(dustSecretKey),
-        // ponytail: pending service is private on WalletFacade but required for submitTransaction
-        (wallet as unknown as { pendingTransactionsService: { start: () => Promise<void> } })
-          .pendingTransactionsService.start(),
-      ]);
+      // ponytail: sequential start lowers peak RAM vs parallel full-network sync
+      await wallet.unshielded.start();
+      await (wallet as unknown as { pendingTransactionsService: { start: () => Promise<void> } })
+        .pendingTransactionsService.start();
+      await wallet.unshielded.waitForSyncedState(DEPLOY_SYNC_GAP);
+      await wallet.dust.start(dustSecretKey);
+      await wallet.dust.waitForSyncedState(DEPLOY_SYNC_GAP);
       return { wallet, shieldedSecretKeys, dustSecretKey, unshieldedKeystore };
     },
   );
@@ -386,9 +386,9 @@ ${DIV}
 ${DIV}
 `);
 
-  await withStatus('Syncing with network', () => waitForDeployReady(wallet));
-  const syncedState = await Rx.firstValueFrom(wallet.state().pipe(Rx.filter(isDeployReady)));
-  const balance = syncedState.unshielded.balances[unshieldedToken().raw] ?? 0n;
+  console.log('  ✓ Synced with network\n');
+  const uState = await Rx.firstValueFrom(wallet.unshielded.state.pipe(Rx.take(1)));
+  const balance = uState.balances[unshieldedToken().raw] ?? 0n;
   if (balance === 0n) {
     const fundedBalance = await withStatus('Waiting for incoming tokens', () =>
       Rx.firstValueFrom(
