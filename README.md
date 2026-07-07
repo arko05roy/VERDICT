@@ -206,9 +206,9 @@ Verify on explorer: `https://explorer.preprod.midnight.network/contract/<address
 
 ## Live Demo
 
-**https://verdict-midnight.vercel.app** (or deploy fresh: `cd verdict && npx vercel --prod`)
+**https://verdict-jade.vercel.app**
 
-Set environment variables from `verdict/.env.example`. Connect Lace on Preprod, then **Run Verification** on a ruleset.
+Connect Lace on Preprod, then **Run Verification** on a ruleset in Explore.
 
 [![CI](https://github.com/arko05roy/VERDICT/actions/workflows/ci.yml/badge.svg)](https://github.com/arko05roy/VERDICT/actions/workflows/ci.yml)
 
