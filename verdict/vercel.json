@@ -1,8 +1,7 @@
 {
-  "buildCommand": "cd verdict && npm run build",
-  "outputDirectory": "verdict/.next",
+  "installCommand": "cd .. && npm ci && cd contract && npm run compact:all",
+  "buildCommand": "npm run build",
   "framework": "nextjs",
-  "installCommand": "npm ci && cd contract && npm run compact:all",
   "env": {
     "MIDNIGHT_NETWORK_ID": "preprod",
     "MIDNIGHT_NODE_URL": "https://rpc.preprod.midnight.network",

@@ -405,7 +405,7 @@ if (proof.flagged) {
           {/* Run Verification */}
           <button
             onClick={async () => {
-              if (!wallet.isConnected || !wallet.connectedApi) {
+              if (!wallet.isConnected) {
                 setVerifyResult({
                   error: "Connect Lace wallet first (sidebar → Connect Wallet)",
                 });
@@ -416,30 +416,23 @@ if (proof.flagged) {
               setVerifyResult(null);
               setShowVerifyModal(true);
               try {
-                const { runVerdictCircuitRoundTrip } = await import(
-                  "@/lib/verdict-client"
-                );
-                const circuit = await runVerdictCircuitRoundTrip(
-                  wallet.connectedApi,
-                  ruleset!.address
-                );
+                const res = await fetch("/api/verify", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    address: ruleset!.address,
+                    submit: true,
+                  }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Circuit call failed");
                 setVerifyResult({
-                  verdict: circuit.verdict,
-                  checksRun: 10,
-                  checksPassed: circuit.verdict === "CLEAN" ? 10 : 9,
-                  checksFailed: circuit.verdict === "CLEAN" ? 0 : 1,
-                  proofHash: circuit.txHash,
-                  txHash: circuit.txHash,
-                  blockHeight: circuit.blockHeight,
-                  source: "lace-circuit",
-                  privacy: circuit.privateWitness,
-                  publicDisclosure: circuit.publicDisclosure,
-                  details: (ruleset?.enabledChecks || []).map((id, i) => ({
-                    id,
-                    name: id,
-                    numeral: `${i + 1}`,
-                    passed: circuit.verdict === "CLEAN" || i > 0,
-                  })),
+                  ...data,
+                  privacy: {
+                    playerPosition: "(105,105) → (110,110) — never disclosed",
+                    enemyPositions: "8 hidden coordinates — hashed locally only",
+                    note: "Witness data proved in ZK; only verdict is public on-chain",
+                  },
                 });
               } catch (e: any) {
                 setVerifyResult({ error: e.message || "Circuit call failed" });

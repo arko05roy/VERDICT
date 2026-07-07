@@ -206,13 +206,9 @@ Verify on explorer: `https://explorer.preprod.midnight.network/contract/<address
 
 ## Live Demo
 
-Deploy the frontend to Vercel:
+**https://verdict-midnight.vercel.app** (or deploy fresh: `cd verdict && npx vercel --prod`)
 
-```bash
-cd verdict && vercel --prod
-```
-
-Set environment variables from `verdict/.env.example`. The dashboard connects to Lace on Preprod and calls `verifyTransition` from the browser.
+Set environment variables from `verdict/.env.example`. Connect Lace on Preprod, then **Run Verification** on a ruleset.
 
 [![CI](https://github.com/arko05roy/VERDICT/actions/workflows/ci.yml/badge.svg)](https://github.com/arko05roy/VERDICT/actions/workflows/ci.yml)
 
