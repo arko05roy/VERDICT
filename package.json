@@ -9,6 +9,9 @@
     "verdict-demo",
     "verdict"
   ],
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts && cd contract && npm test"
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@types/node": "^25.5.0",
@@ -48,6 +51,9 @@
   "overrides": {
     "smoldot": "npm:@aspect-build/empty@0.0.0",
     "@midnight-ntwrk/compact-runtime": "0.15.0",
+    "@midnight-ntwrk/compact-js": {
+      "@midnight-ntwrk/compact-runtime": "0.15.0"
+    },
     "@midnight-ntwrk/ledger-v7": "7.0.2",
     "@midnight-ntwrk/midnight-js-network-id": "3.1.0"
   }

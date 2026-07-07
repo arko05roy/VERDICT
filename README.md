@@ -1,5 +1,7 @@
 # VERDICT
 
+This project is built on the [Midnight Network](https://midnight.network/).
+
 ### *Verdict doesn't ask systems to be honest. It makes dishonesty mathematically impossible.*
 
 **Universal Zero-Knowledge Integrity Protocol on Midnight**
@@ -145,6 +147,8 @@ ratri/
 ├── contract/                 # ZK circuit + Midnight JS wrapper
 │   ├── src/verdict.compact   # THE circuit — 10 checks, ~940 constraints
 │   └── src/managed/          # Compiled ZK IR, prover/verifier keys
+├── tests/                    # Root-level contract smoke tests (rubric entry point)
+│   └── verdict.test.ts
 ├── counter-cli/              # Midnight CLI + Docker orchestration
 │   ├── standalone.yml        # Docker Compose: node + indexer + proof-server
 │   └── src/standalone.ts     # Boot local Midnight stack
@@ -159,6 +163,7 @@ ratri/
 ```bash
 git clone <repo-url> && cd ratri
 npm install
+npm test          # runs tests/ + contract/src/test/ (42 tests)
 bash start.sh
 ```
 
@@ -172,6 +177,16 @@ npm run dev
 ```
 
 The simulator runs the full ZK circuit in-memory with pre-seeded example rulesets — no external infrastructure required.
+
+---
+
+## Contract Address
+
+| Contract | Network | Address |
+|----------|---------|---------|
+| **VERDICT** (`verdict.compact`) | Undeployed (local standalone) | `b9184c39f154e1284f17f53dcbb15a20361a2b159c9bf7b4118d7d958f674e99` |
+
+Deployed via the local Midnight stack (`counter-cli/standalone.yml`). To deploy on **Preprod**, run `cd counter-cli && npm run preprod-ps` and save the address printed after deployment.
 
 ---
 

@@ -1,13 +1,119 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="1" failures="1" errors="0" time="0">
-    <testsuite name="src/test/verdict-dao.test.ts" timestamp="2026-04-01T06:41:35.230Z" hostname="Arkos-MacBook-Air.local" tests="1" failures="1" errors="0" skipped="0" time="0">
-        <testcase classname="src/test/verdict-dao.test.ts" name="src/test/verdict-dao.test.ts" time="0">
-            <failure message="Version mismatch: compiled code expects 0.15.0, runtime is 0.14.0" type="CompactError">
-CompactError: Version mismatch: compiled code expects 0.15.0, runtime is 0.14.0
- ❯ Module.checkRuntimeVersion ../node_modules/@midnight-ntwrk/compact-runtime/src/version.ts:14:12
- ❯ src/managed/verdict-dao/contract/index.js:7:23
- ❯ src/test/verdict-dao-simulator.ts:7:1
-            </failure>
+<testsuites name="vitest tests" tests="41" failures="0" errors="0" time="0.831156292">
+    <testsuite name="src/test/counter.test.ts" timestamp="2026-07-07T14:37:27.876Z" hostname="Arkos-MacBook-Air.local" tests="3" failures="0" errors="0" skipped="0" time="0.029400375">
+        <testcase classname="src/test/counter.test.ts" name="Counter smart contract &gt; generates initial ledger state deterministically" time="0.024375666">
+        </testcase>
+        <testcase classname="src/test/counter.test.ts" name="Counter smart contract &gt; properly initializes ledger state and private state" time="0.001959">
+        </testcase>
+        <testcase classname="src/test/counter.test.ts" name="Counter smart contract &gt; increments the counter correctly" time="0.00237425">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/test/verdict-dao.test.ts" timestamp="2026-07-07T14:37:27.876Z" hostname="Arkos-MacBook-Air.local" tests="28" failures="0" errors="0" skipped="0" time="0.6595125">
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; constructor sets voteThreshold correctly" time="0.038724">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; registerCouncilMember adds member and increments councilSize" time="0.017293209">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; registerCouncilMember adds multiple members" time="0.020753875">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; registerGenesisCheck adds check to registry and increments totalChecks" time="0.01883675">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; proposeCheck creates a proposal and increments totalProposals" time="0.018694334">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; council member can vote FOR a proposal" time="0.02172125">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; council member can vote AGAINST a proposal" time="0.020914">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; multiple council members can vote on a proposal" time="0.032624">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; non-council member cannot vote (assert fails)" time="0.016642917">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; same member cannot vote twice on same proposal (assert fails)" time="0.020340667">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; finalizeProposal accepts proposal when votesFor &gt;= threshold and registers check" time="0.0331105">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; finalizeProposal rejects proposal when votesFor &lt; threshold" time="0.028000125">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; cannot finalize an already finalized proposal (assert fails)" time="0.029718583">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; registers 10 genesis checks (guardian set)" time="0.041234083">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; registerGenesisVerifier creates v1.0 with all 10 guardians" time="0.01654625">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; registerVerifierVersion requires council membership" time="0.013021083">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; council member can register a new verifier version" time="0.020332125">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; registerRuleset creates a lightweight ruleset pointing to verifier v1.0" time="0.018856917">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; registerRuleset fails if enableMask exceeds verifier guardianMask" time="0.01454625">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; registerRuleset fails if verifier version does not exist" time="0.012511083">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; multiple rulesets can reference the same verifier version" time="0.0242515">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; migrateRuleset moves ruleset to a newer verifier version" time="0.024308542">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; migrateRuleset fails if caller is not owner" time="0.021071667">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; migrateRuleset fails if enableMask exceeds new verifier mask" time="0.021559959">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; deactivateRuleset marks ruleset as inactive" time="0.017601459">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; deactivateRuleset fails if caller is not owner" time="0.016615791">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; deactivateRuleset fails if already inactive" time="0.01742125">
+        </testcase>
+        <testcase classname="src/test/verdict-dao.test.ts" name="VERDICT DAO governance contract &gt; full flow: council → genesis checks → genesis verifier → propose check → vote → finalize → register ruleset → migrate" time="0.060966333">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/test/verdict.test.ts" timestamp="2026-07-07T14:37:27.878Z" hostname="Arkos-MacBook-Air.local" tests="10" failures="0" errors="0" skipped="0" time="0.142243417">
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; initializes ledger state correctly" time="0.025711792">
+        </testcase>
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; startSession sets sessionActive and lastChainHash" time="0.008304542">
+        </testcase>
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; commitMove stores commitment on ledger" time="0.007484917">
+        </testcase>
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CLEAN move → verdict = clean (0), totalFlagged = 0" time="0.018857667">
+            <system-out>
+CLEAN: { verdict: 0, totalChecks: 1n, totalFlagged: 0n }
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 3: TELEPORT → flagged (velocity = 1590 &gt; 100)" time="0.014606333">
+            <system-out>
+TELEPORT: { verdict: 1, totalFlagged: 1n }
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 5: OUT OF BOUNDS → flagged (x = 1001 &gt; 1000)" time="0.014525333">
+            <system-out>
+OOB: { verdict: 1, totalFlagged: 1n }
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 6: INVALID ACTION → flagged (action = 99 &gt;= 4)" time="0.013560459">
+            <system-out>
+INVALID ACTION: { verdict: 1, totalFlagged: 1n }
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 8: BOT → flagged (all same actions, diversity = 0)" time="0.013030375">
+            <system-out>
+BOT: { verdict: 1, totalFlagged: 1n }
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; CHECK 4: SPEED RAMP → flagged (accel = 90 &gt; 50)" time="0.012940625">
+            <system-out>
+SPEED RAMP: { verdict: 1, totalFlagged: 1n }
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/test/verdict.test.ts" name="VERDICT 10-check circuit &gt; totalChecks increments on each verifyTransition call" time="0.012169875">
+            <system-out>
+After 1 verify: totalChecks = 1n
+
+            </system-out>
         </testcase>
     </testsuite>
 </testsuites>
