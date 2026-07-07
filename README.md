@@ -206,7 +206,8 @@ Verify on explorer: `https://explorer.preprod.midnight.network/contract/<address
 
 ## Live Demo
 
-**https://verdict-jade.vercel.app**
+- **App:** https://verdict-jade.vercel.app
+- **Demo video:** https://youtu.be/O64oQYzj__o
 
 Connect Lace on Preprod, then **Run Verification** on a ruleset in Explore.
 
@@ -250,15 +251,11 @@ See [product proposal](docs/product-proposal.md) — **Private Allowlist Access*
 
 ---
 
-## Demo Video Checklist
+## Demo Video
 
-Record (~1 min):
+**https://youtu.be/O64oQYzj__o**
 
-1. Open dashboard → Connect Lace (Preprod)
-2. Navigate to Explore → genesis ruleset
-3. Click **Run Verification** → wait for ZK proof
-4. Show `CLEAN` verdict + privacy panel (witness hidden)
-5. Optional: show contract on [Preprod explorer](https://explorer.preprod.midnight.network)
+Shows wallet connect + circuit verification on [verdict-jade.vercel.app](https://verdict-jade.vercel.app).
 
 Script reference: [`verdict/script.md`](verdict/script.md)
 
@@ -286,7 +283,7 @@ npm test   # 42 tests (1 root + 10 verdict + 28 DAO + 3 files)
 | 3+ tests | ✅ 42 passing |
 | CI/CD | ✅ `.github/workflows/ci.yml` |
 | Product proposal | ✅ `docs/product-proposal.md` |
-| Privacy model README | ✅ Above |
+| Demo video | ✅ [youtu.be/O64oQYzj__o](https://youtu.be/O64oQYzj__o) |
 
 ---
 
