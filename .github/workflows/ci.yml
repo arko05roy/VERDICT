@@ -20,9 +20,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Compile Compact contracts
-        run: cd contract && npm run compact:all
-
+      # ponytail: compact CLI is a native Midnight tool, not on npm — use committed contract/dist + src/managed
       - name: Run tests
         run: npm test
 
