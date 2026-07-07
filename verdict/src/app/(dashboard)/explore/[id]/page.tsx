@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
-import { explorerContractUrl } from "@/lib/config";
 
 type Ruleset = {
   address: string;
