@@ -202,7 +202,11 @@ export const waitForSync = (wallet: WalletFacade) =>
   Rx.firstValueFrom(wallet.state().pipe(Rx.throttleTime(5_000), Rx.filter((state) => state.isSynced)));
 
 // ponytail: full shielded sync OOMs on Preprod; deploy fees are unshielded+dust only
-const DEPLOY_SYNC_GAP = 100_000n;
+// Preprod's public indexer can be several hundred thousand blocks behind while
+// a fresh in-memory wallet catches up. Deployment only needs recent unshielded
+// UTXOs and dust, so use a permissive catch-up window instead of waiting for a
+// full historical sync.
+const DEPLOY_SYNC_GAP = 2_000_000n;
 
 const isDeployReady = (state: { unshielded: { progress: { isStrictlyComplete: () => boolean }; balances: Record<string, bigint> }; dust: { state: { progress: { isCompleteWithin: (g: bigint) => boolean } } } }) =>
   (state.unshielded.progress.isStrictlyComplete() || (state.unshielded.balances[unshieldedToken().raw] ?? 0n) > 0n) &&
