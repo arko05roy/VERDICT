@@ -32,7 +32,10 @@ import type {
   WalletProvider,
 } from "@midnight-ntwrk/midnight-js-types";
 import { assertIsContractAddress, toHex } from "@midnight-ntwrk/midnight-js-utils";
-import { WalletFacade } from "@midnight-ntwrk/wallet-sdk-facade";
+import {
+  WalletFacade,
+  type DefaultConfiguration,
+} from "@midnight-ntwrk/wallet-sdk-facade";
 import { DustWallet } from "@midnight-ntwrk/wallet-sdk-dust-wallet";
 import { HDWallet, Roles } from "@midnight-ntwrk/wallet-sdk-hd";
 import { ShieldedWallet } from "@midnight-ntwrk/wallet-sdk-shielded";
@@ -340,8 +343,7 @@ async function initSingleton(): Promise<void> {
   );
 
   // Build wallet
-  const wallet = await WalletFacade.init({
-    configuration: {
+  const walletConfiguration: DefaultConfiguration = {
       networkId,
       indexerClientConnection: {
         indexerHttpUrl: INDEXER_URL,
@@ -354,7 +356,10 @@ async function initSingleton(): Promise<void> {
         additionalFeeOverhead: 300_000_000_000_000n,
         feeBlocksMargin: 5,
       },
-    },
+  };
+
+  const wallet = await WalletFacade.init({
+    configuration: walletConfiguration,
     shielded: (cfg) =>
       ShieldedWallet(cfg).startWithSecretKeys(shieldedSecretKeys),
     unshielded: (cfg) =>
@@ -367,9 +372,6 @@ async function initSingleton(): Promise<void> {
       DustWallet({
         networkId: cfg.networkId,
         costParameters: cfg.costParameters,
-        indexerClientConnection: cfg.indexerClientConnection,
-        provingServerUrl: cfg.provingServerUrl,
-        relayURL: cfg.relayURL,
       }).startWithSecretKey(
         dustSecretKey,
         ledger.LedgerParameters.initialParameters().dust

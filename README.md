@@ -6,6 +6,16 @@ This project is built on the [Midnight Network](https://midnight.network/).
 
 **Universal Zero-Knowledge Integrity Protocol on Midnight**
 
+![VERDICT deploy dashboard](docs/screenshots/deploy.png)
+
+### Test evidence
+
+![Test output showing 41 passing contract tests](docs/screenshots/test-output.png)
+
+VERDICT provides a five-step ruleset deployment flow: describe the rules, choose
+Guardians, configure parameters, review the generated Compact circuit, and
+register the ruleset on Midnight.
+
 ---
 
 ## The Problem
@@ -75,7 +85,9 @@ Four violation classes:
 
 ## Deploy — The Developer Story
 
-Write rules in plain English. Hit compile. Verdict translates them into a Compact ZK circuit — Midnight's native language — validates the syntax, and gives you a deployable contract.
+Write rules in VCL, the deterministic Verdict Compile Language. Hit compile.
+VERDICT validates the configuration and generates a Guardian-specific Compact
+ZK circuit — Midnight's native language — for review and deployment.
 
 ```
 "Claim payouts must match the policy tier."
@@ -83,7 +95,10 @@ Write rules in plain English. Hit compile. Verdict translates them into a Compac
 "Player health cannot go below zero."
 ```
 
-That compiles to real Compact. Pragma 0.22. Runs inside Midnight's ZK prover. The system under verification never sees the private data. The circuit sees **witnesses** — private inputs that get verified and discarded. That's the Midnight primitive doing what it was built for.
+That compiles to real Compact. The circuit runs inside Midnight's ZK prover. The
+system under verification never sees the private data. The circuit sees
+**witnesses** — private inputs that get verified and discarded. AI assistance,
+when enabled, only recommends Guardians; it never generates circuit code.
 
 From writing English rules to a live ZK verification endpoint. One workflow.
 
@@ -130,7 +145,7 @@ No more trusting platforms when they say "we follow the rules." Show me the proo
 | **Blockchain** | Midnight (ledger v7) |
 | **Proof Generation** | Midnight proof-server |
 | **Wallet** | @midnight-ntwrk/wallet-sdk |
-| **AI Compilation** | Google Gemini (English to Compact) |
+| **AI Assistance** | Google Gemini suggests Guardians and parameters only |
 | **Infrastructure** | Docker Compose (node + indexer + proof-server) |
 | **Testing** | Vitest |
 
@@ -163,7 +178,7 @@ ratri/
 ```bash
 git clone <repo-url> && cd ratri
 npm install
-npm test          # runs tests/ + contract/src/test/ (42 tests)
+npm test          # runs root smoke test + contract suite (42 tests total)
 bash start.sh
 ```
 
@@ -175,6 +190,9 @@ For development without Docker (simulator mode):
 cd verdict
 npm run dev
 ```
+
+The development server runs with Webpack explicitly (`next dev --webpack`) to
+match the project configuration.
 
 The simulator runs the full ZK circuit in-memory with pre-seeded example rulesets — no external infrastructure required.
 

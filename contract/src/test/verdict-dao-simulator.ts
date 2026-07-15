@@ -18,17 +18,25 @@ export type VerdictDaoPrivateState = {
 };
 
 export type DaoWitnesses = {
-  getCallerHash(context: WitnessContext<Ledger, VerdictDaoPrivateState>): [VerdictDaoPrivateState, Uint8Array];
-  getCurrentTick(context: WitnessContext<Ledger, VerdictDaoPrivateState>): [VerdictDaoPrivateState, bigint];
+  getCallerHash(
+    _context: WitnessContext<Ledger, VerdictDaoPrivateState>
+  ): [VerdictDaoPrivateState, Uint8Array];
+  getCurrentTick(
+    _context: WitnessContext<Ledger, VerdictDaoPrivateState>
+  ): [VerdictDaoPrivateState, bigint];
 };
 
 export const daoWitnesses: DaoWitnesses = {
-  getCallerHash(ctx: WitnessContext<Ledger, VerdictDaoPrivateState>): [VerdictDaoPrivateState, Uint8Array] {
+  getCallerHash(
+    ctx: WitnessContext<Ledger, VerdictDaoPrivateState>
+  ): [VerdictDaoPrivateState, Uint8Array] {
     return [ctx.privateState, ctx.privateState.callerHash];
   },
-  getCurrentTick(ctx: WitnessContext<Ledger, VerdictDaoPrivateState>): [VerdictDaoPrivateState, bigint] {
+  getCurrentTick(
+    ctx: WitnessContext<Ledger, VerdictDaoPrivateState>
+  ): [VerdictDaoPrivateState, bigint] {
     return [ctx.privateState, ctx.privateState.currentTick];
-  },
+  }
 };
 
 export class VerdictDaoSimulator {
@@ -186,10 +194,7 @@ export class VerdictDaoSimulator {
     return this.getLedger();
   }
 
-  public migrateRuleset(
-    rulesetId: bigint,
-    newVerifierVersion: bigint
-  ): Ledger {
+  public migrateRuleset(rulesetId: bigint, newVerifierVersion: bigint): Ledger {
     this.circuitContext = this.contract.impureCircuits.migrateRuleset(
       this.circuitContext,
       rulesetId,

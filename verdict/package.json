@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "npm run copy-zk && next build --webpack",
     "start": "next start",
     "copy-zk": "mkdir -p public/zk/verdict && cp -R ../contract/src/managed/verdict/keys ../contract/src/managed/verdict/zkir public/zk/verdict/"

@@ -18,12 +18,17 @@ import plugin from "@typescript-eslint/eslint-plugin";
 import parser from "@typescript-eslint/parser";
 import pluginPrettier from "eslint-plugin-prettier";
 
+const nodeGlobals = {
+  console: "readonly"
+};
+
 export default [
   js.configs.recommended,
   {
     files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       parser,
+      globals: nodeGlobals,
       parserOptions: {
         ecmaVersion: "latest",
         sourceType: "module",
@@ -35,6 +40,7 @@ export default [
       prettier: pluginPrettier
     },
     rules: {
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
       "prettier/prettier": "error",
       "@typescript-eslint/no-misused-promises": "off",
       "@typescript-eslint/no-floating-promises": "warn",

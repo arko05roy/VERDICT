@@ -9,48 +9,78 @@ export type VerdictPrivateState = {
   isFirstMove: bigint;
   prevHash: Uint8Array;
   nonce: Uint8Array;
-  aimHistory: bigint[];    // 16 values (8 x [x,y] flattened)
+  aimHistory: bigint[]; // 16 values (8 x [x,y] flattened)
   actionHistory: bigint[]; // 8 values
-  tickHistory: bigint[];   // 8 values
+  tickHistory: bigint[]; // 8 values
   currentTick: bigint;
   enemyPositions: bigint[]; // 16 values (8 x [x,y] flattened)
 };
 
+// Kept for the legacy counter smoke test that remains part of the contract suite.
+// The VERDICT circuit itself uses VerdictPrivateState above.
+export type CounterPrivateState = {
+  privateCounter: number;
+};
+
 export const witnesses: Witnesses<VerdictPrivateState> = {
-  getPrevPrevPos(ctx: WitnessContext<Ledger, VerdictPrivateState>): [VerdictPrivateState, bigint[]] {
+  getPrevPrevPos(
+    ctx: WitnessContext<Ledger, VerdictPrivateState>
+  ): [VerdictPrivateState, bigint[]] {
     return [ctx.privateState, [...ctx.privateState.prevPrevPos]];
   },
-  getPrevPos(ctx: WitnessContext<Ledger, VerdictPrivateState>): [VerdictPrivateState, bigint[]] {
+  getPrevPos(
+    ctx: WitnessContext<Ledger, VerdictPrivateState>
+  ): [VerdictPrivateState, bigint[]] {
     return [ctx.privateState, [...ctx.privateState.prevPos]];
   },
-  getCurrPos(ctx: WitnessContext<Ledger, VerdictPrivateState>): [VerdictPrivateState, bigint[]] {
+  getCurrPos(
+    ctx: WitnessContext<Ledger, VerdictPrivateState>
+  ): [VerdictPrivateState, bigint[]] {
     return [ctx.privateState, [...ctx.privateState.currPos]];
   },
-  getAction(ctx: WitnessContext<Ledger, VerdictPrivateState>): [VerdictPrivateState, bigint] {
+  getAction(
+    ctx: WitnessContext<Ledger, VerdictPrivateState>
+  ): [VerdictPrivateState, bigint] {
     return [ctx.privateState, ctx.privateState.action];
   },
-  getIsFirstMove(ctx: WitnessContext<Ledger, VerdictPrivateState>): [VerdictPrivateState, bigint] {
+  getIsFirstMove(
+    ctx: WitnessContext<Ledger, VerdictPrivateState>
+  ): [VerdictPrivateState, bigint] {
     return [ctx.privateState, ctx.privateState.isFirstMove];
   },
-  getPrevHash(ctx: WitnessContext<Ledger, VerdictPrivateState>): [VerdictPrivateState, Uint8Array] {
+  getPrevHash(
+    ctx: WitnessContext<Ledger, VerdictPrivateState>
+  ): [VerdictPrivateState, Uint8Array] {
     return [ctx.privateState, ctx.privateState.prevHash];
   },
-  getNonce(ctx: WitnessContext<Ledger, VerdictPrivateState>): [VerdictPrivateState, Uint8Array] {
+  getNonce(
+    ctx: WitnessContext<Ledger, VerdictPrivateState>
+  ): [VerdictPrivateState, Uint8Array] {
     return [ctx.privateState, ctx.privateState.nonce];
   },
-  getAimHistory(ctx: WitnessContext<Ledger, VerdictPrivateState>): [VerdictPrivateState, bigint[]] {
+  getAimHistory(
+    ctx: WitnessContext<Ledger, VerdictPrivateState>
+  ): [VerdictPrivateState, bigint[]] {
     return [ctx.privateState, ctx.privateState.aimHistory];
   },
-  getActionHistory(ctx: WitnessContext<Ledger, VerdictPrivateState>): [VerdictPrivateState, bigint[]] {
+  getActionHistory(
+    ctx: WitnessContext<Ledger, VerdictPrivateState>
+  ): [VerdictPrivateState, bigint[]] {
     return [ctx.privateState, ctx.privateState.actionHistory];
   },
-  getTickHistory(ctx: WitnessContext<Ledger, VerdictPrivateState>): [VerdictPrivateState, bigint[]] {
+  getTickHistory(
+    ctx: WitnessContext<Ledger, VerdictPrivateState>
+  ): [VerdictPrivateState, bigint[]] {
     return [ctx.privateState, ctx.privateState.tickHistory];
   },
-  getCurrentTick(ctx: WitnessContext<Ledger, VerdictPrivateState>): [VerdictPrivateState, bigint] {
+  getCurrentTick(
+    ctx: WitnessContext<Ledger, VerdictPrivateState>
+  ): [VerdictPrivateState, bigint] {
     return [ctx.privateState, ctx.privateState.currentTick];
   },
-  getEnemyPositions(ctx: WitnessContext<Ledger, VerdictPrivateState>): [VerdictPrivateState, bigint[]] {
+  getEnemyPositions(
+    ctx: WitnessContext<Ledger, VerdictPrivateState>
+  ): [VerdictPrivateState, bigint[]] {
     return [ctx.privateState, ctx.privateState.enemyPositions];
-  },
+  }
 };

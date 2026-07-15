@@ -2,7 +2,7 @@
 const WS =
   typeof globalThis.WebSocket !== "undefined"
     ? globalThis.WebSocket
-    : (class {} as typeof WebSocket);
+    : (class {} as unknown as typeof WebSocket);
 
 export { WS as WebSocket };
 export default WS;

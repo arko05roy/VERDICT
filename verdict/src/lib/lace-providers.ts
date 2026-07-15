@@ -3,7 +3,6 @@ import {
   Transaction,
   SignatureEnabled,
   Proof,
-  PreBinding,
   Binding,
   CostModel,
   type FinalizedTransaction,
@@ -78,9 +77,9 @@ export async function createLaceProviders<K extends string>(
         payFees: true,
       });
       return Transaction.deserialize(
-        SignatureEnabled.instance,
-        Proof.instance,
-        Binding.instance,
+        "signature",
+        "proof",
+        "binding",
         fromHex(balancedHex)
       ) as FinalizedTransaction;
     },

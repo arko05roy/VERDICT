@@ -42,14 +42,16 @@ export class VerdictSimulator {
 
   public startSession(genesisHash: Uint8Array): Ledger {
     this.circuitContext = this.contract.impureCircuits.startSession(
-      this.circuitContext, genesisHash
+      this.circuitContext,
+      genesisHash
     ).context;
     return this.getLedger();
   }
 
   public commitMove(commitment: Uint8Array): Ledger {
     this.circuitContext = this.contract.impureCircuits.commitMove(
-      this.circuitContext, commitment
+      this.circuitContext,
+      commitment
     ).context;
     return this.getLedger();
   }
@@ -66,14 +68,22 @@ export class VerdictSimulator {
     snapThreshold: bigint,
     maxSnaps: bigint,
     maxCorrelation: bigint,
-    enemyPosHashPublic: Uint8Array,
+    enemyPosHashPublic: Uint8Array
   ): { verdict: number; ledger: Ledger } {
     const result = this.contract.impureCircuits.verifyTransition(
       this.circuitContext,
-      maxVelocity, maxAcceleration, boundX, boundY,
-      validActionCount, maxActionsPerWindow, windowSize,
-      minDiversity, snapThreshold, maxSnaps, maxCorrelation,
-      enemyPosHashPublic,
+      maxVelocity,
+      maxAcceleration,
+      boundX,
+      boundY,
+      validActionCount,
+      maxActionsPerWindow,
+      windowSize,
+      minDiversity,
+      snapThreshold,
+      maxSnaps,
+      maxCorrelation,
+      enemyPosHashPublic
     );
     this.circuitContext = result.context;
     return { verdict: result.result, ledger: this.getLedger() };
