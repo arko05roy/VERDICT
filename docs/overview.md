@@ -27,22 +27,15 @@ VERDICT DAO (on-chain governance)
     |
     +-- Guardian Registry (10 genesis checks, extensible via proposals)
     |
-    +-- Verifier Versions (immutable, compiled once per Guardian set)
-    |     +-- v1.0 — Guardians I-X (genesis)
-    |     +-- v1.1 — Guardians I-XI (after DAO approves Guardian XI)
-    |     +-- ...
-    |
-    +-- Rulesets (lightweight entries, no compilation needed)
-          +-- Ruleset A -> Verifier v1.0, mask=0b1111100011, params={...}
-          +-- Ruleset B -> Verifier v1.0, mask=0b1111111111, params={...}
-          +-- Ruleset C -> Verifier v1.1, mask=0b11111111111, params={...}
+    +-- Rulesets (independent contracts compiled from selected Guardians)
+          +-- Ruleset A -> Guardians I, II, V, params={...}
+          +-- Ruleset B -> Guardians I-X, params={...}
+          +-- Ruleset C -> Guardians II, VI, X, params={...}
 ```
 
-**Verifier contracts** are compiled once and immutable. They contain a fixed set of Guardians. New Guardians require a new verifier version — old ones are never modified.
-
-**Rulesets** are lightweight on-chain entries. They reference a verifier version, specify which Guardians to enable (bitmask), and set parameters. No contract compilation needed — registering a ruleset is instant.
-
-**Migration** is opt-in. When the DAO approves a new Guardian and a new verifier version is compiled, existing rulesets keep working on their current verifier. Owners can migrate to the new version if they want the new Guardian.
+Each **ruleset contract** is compiled once from the selected Guardian templates and
+is immutable after deployment. New Guardians or changed selections produce a new
+independent contract; existing rulesets remain verifiable.
 
 ## The Guardians
 
@@ -63,7 +56,9 @@ VERDICT's verification primitives are called **Guardians** — each named after 
 
 Guardians I-II use hard assertions — if broken, no valid proof exists. Guardians III-X are soft flags that aggregate into the final verdict.
 
-Rulesets are configured using **VCL (Verdict Compile Language)** — a declaration format that maps Guardian selections and parameters to a verifier version + bitmask. The Guardian library is governed by an on-chain DAO.
+Rulesets are configured using **VCL (Verdict Compile Language)** — a declaration
+format that maps Guardian selections and parameters to deterministic Compact code.
+The Guardian library is governed by an on-chain DAO.
 
 ## Governance
 

@@ -6,7 +6,7 @@ Every rule-based system — a game, a financial exchange, an insurance processor
 
 Instead of building bespoke verification for every domain, VERDICT consolidates the entire problem space into **10 mathematical checks** that run inside a single ZK circuit. These 10 checks map to the fundamental categories of rule violation that exist across any system processing state transitions.
 
-The genesis verifier circuit (`verdict.compact`) is written in [Compact](https://docs.midnight.network), Midnight's native ZK language. All 10 checks execute in a single `verifyTransition` call. Rulesets enable a subset of these checks via a bitmask and configure their parameters — no per-ruleset compilation needed. The private data enters as **witnesses** — verified inside the circuit, never revealed. Only the verdict is public: `CLEAN` or `FLAGGED`.
+The reference verifier circuit (`verdict.compact`) is written in [Compact](https://docs.midnight.network), Midnight's native ZK language. All 10 checks execute in a single `verifyTransition` call. Each deployed ruleset is deterministically compiled from its selected Guardian templates and parameters; fewer Guardians produce a smaller circuit. The private data enters as **witnesses** — verified inside the circuit, never revealed. Only the verdict is public: `CLEAN` or `FLAGGED`.
 
 ---
 

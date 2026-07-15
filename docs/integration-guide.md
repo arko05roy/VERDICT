@@ -53,7 +53,7 @@ VCL compiles to a configuration object:
 ```typescript
 {
   verifierVersion: "1",       // which verifier contract to use
-  enableMask: 0b0010010111n,  // which Guardians are active (bitmask)
+  enabledChecks: ["Mnemosyne", "Hermes", "Terminus"],
   params: {                   // Guardian parameters
     maxVelocity: "5",
     boundX: "1000",

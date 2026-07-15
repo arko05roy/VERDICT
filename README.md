@@ -2,6 +2,9 @@
 
 This project is built on the [Midnight Network](https://midnight.network/).
 
+[![CI](https://github.com/arko05roy/VERDICT/actions/workflows/ci.yml/badge.svg)](https://github.com/arko05roy/VERDICT/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/demo-Preprod%20dashboard-7c3aed)](https://verdict-jade.vercel.app)
+
 ### *Verdict doesn't ask systems to be honest. It makes dishonesty mathematically impossible.*
 
 **Universal Zero-Knowledge Integrity Protocol on Midnight**
@@ -175,6 +178,10 @@ ratri/
 
 ## Running Locally
 
+See [docs/setup.md](docs/setup.md) for prerequisites, environment variables, and
+the full local/simulator workflow. See [docs/integration-guide.md](docs/integration-guide.md)
+for SDK usage.
+
 ```bash
 git clone <repo-url> && cd ratri
 npm install
@@ -202,7 +209,7 @@ The simulator runs the full ZK circuit in-memory with pre-seeded example ruleset
 
 | Contract | Network | Address |
 |----------|---------|---------|
-| **VERDICT** (`verdict.compact`) | **Preprod** | _Deploy below, then paste address here_ |
+| **VERDICT** (`verdict.compact`) | **Preprod** | **Not yet published** — deployment is blocked by the current Preprod RPC sync loop |
 
 ### One-time deploy (requires funded wallet)
 
@@ -235,7 +242,9 @@ Redeploy Vercel after adding env vars. Verify on [Preprod explorer](https://expl
 
 Connect Lace on Preprod, then **Run Verification** on a ruleset in Explore.
 
-[![CI](https://github.com/arko05roy/VERDICT/actions/workflows/ci.yml/badge.svg)](https://github.com/arko05roy/VERDICT/actions/workflows/ci.yml)
+The Vercel deployment currently proves the dashboard and API health endpoints are
+live. A public contract address must be added here after a successful funded-wallet
+deployment; do not submit the placeholder as a deployed contract.
 
 ---
 
@@ -295,6 +304,11 @@ npm test   # 42 tests (1 root + 10 verdict + 28 DAO + 3 files)
 
 ---
 
+## Submission Readiness
+
+The authoritative, judge-facing checklist is [docs/submission-checklist.md](docs/submission-checklist.md).
+The short demo script is [docs/demo-script.md](docs/demo-script.md).
+
 ## Level 2 / Level 3 Submission
 
 | Requirement | Status |
@@ -302,12 +316,13 @@ npm test   # 42 tests (1 root + 10 verdict + 28 DAO + 3 files)
 | Lace connect/disconnect | ✅ Sidebar wallet |
 | Circuit from frontend | ✅ `verdict-client.ts` via Lace |
 | Privacy behavior | ✅ Witness hidden, verdict public |
-| Preprod contract | ⚙️ Run `deploy:preprod` + Vercel env vars (see README) |
-| 8+ commits | ✅ |
+| Preprod contract | ⏳ Publish funded-wallet deployment address (see [submission checklist](docs/submission-checklist.md)) |
+| 15+ meaningful commits | ✅ 55 commits on `main` |
 | 3+ tests | ✅ 42 passing |
 | CI/CD | ✅ `.github/workflows/ci.yml` |
 | Product proposal | ✅ `docs/product-proposal.md` |
 | Demo video | ✅ [youtu.be/O64oQYzj__o](https://youtu.be/O64oQYzj__o) |
+| Product X profile | ⏳ Create profile and replace the marked link in [docs/submission-checklist.md](docs/submission-checklist.md) |
 
 ---
 
