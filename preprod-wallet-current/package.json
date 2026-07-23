@@ -6,7 +6,8 @@
     "status": "tsx src/status.ts",
     "dust-parallel": "tsx src/dust-parallel.ts",
     "deploy": "tsx src/deploy-current.ts",
-    "deploy:dao": "DEPLOY_CONTRACT=dao tsx src/deploy-current.ts"
+    "deploy:dao": "DEPLOY_CONTRACT=dao tsx src/deploy-current.ts",
+    "fund:50": "tsx src/fund-50-addresses.ts"
   },
   "dependencies": {
     "@midnight-ntwrk/compact-js": "2.5.1",

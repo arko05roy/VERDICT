@@ -313,11 +313,18 @@ See [product proposal](docs/product-proposal.md) — **Private Allowlist Access*
 
 ## Demo Video
 
-**https://youtu.be/O64oQYzj__o**
+[Watch the VERDICT demo video on YouTube](https://youtu.be/O64oQYzj__o)
 
 Shows wallet connect + circuit verification on [verdict-jade.vercel.app](https://verdict-jade.vercel.app).
 
 Script reference: [`verdict/script.md`](verdict/script.md)
+
+---
+
+## Project Resources
+
+- [Project document](https://docs.google.com/document/d/187WgVarkLMDn08igfaFlUGqLZlrx0auccuKh9k5ebgA/edit?usp=sharing)
+- [Project spreadsheet](https://docs.google.com/spreadsheets/d/17PxdsaiEy9neLjag383xV-5owxRIc1nUu9KaH0QGbJU/edit?usp=sharing)
 
 ---
 
