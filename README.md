@@ -232,9 +232,9 @@ cd preprod-wallet-current
 npm ci
 
 # Compile the actual repository contracts, including proving keys.
-./.compact/versions/0.31.1/aarch64-darwin/compactc \
+compactc \
   ../contract/src/verdict.compact src/managed/verdict
-./.compact/versions/0.31.1/aarch64-darwin/compactc \
+compactc \
   ../contract/src/verdict-dao.compact src/managed/verdict-dao
 
 # First use of a funded seed: replay ordered wallet history and save tDUST state.

@@ -1,8 +1,16 @@
 /node_modules
+**/node_modules/
 /dist
 /counter-cli/dist
 /counter-cli/logs/preprod-deploy.json
+/counter-cli/logs/
 /verdict/.env.local
 # /contract/dist — committed so Vercel can resolve @midnight-ntwrk/verdict-contract
 /verdict-demo/midnight-level-db
 /jarvis copy.md
+
+# Local Preprod deployment state and platform-specific tooling
+/preprod-wallet-current/.compact/
+/preprod-wallet-current/.dust-ranges/
+/preprod-wallet-current/dust-snapshot.json
+/preprod-wallet-current/*-private-state/
