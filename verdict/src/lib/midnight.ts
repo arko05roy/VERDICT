@@ -16,8 +16,8 @@ import {
   type VerdictPrivateState,
   witnesses,
 } from "../../../contract/dist/index.js";
-import * as ledger from "@midnight-ntwrk/ledger-v7";
-import { unshieldedToken } from "@midnight-ntwrk/ledger-v7";
+import * as ledger from "@midnight-ntwrk/ledger-v8";
+import { unshieldedToken } from "@midnight-ntwrk/ledger-v8";
 import { deployContract, findDeployedContract } from "@midnight-ntwrk/midnight-js-contracts";
 import { httpClientProofProvider } from "@midnight-ntwrk/midnight-js-http-client-proof-provider";
 import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider";

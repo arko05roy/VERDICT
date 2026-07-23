@@ -7,7 +7,7 @@ import {
   CostModel,
   type FinalizedTransaction,
   type ProvingProvider,
-} from "@midnight-ntwrk/ledger-v7";
+} from "@midnight-ntwrk/ledger-v8";
 import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider";
 import {
   getNetworkId,

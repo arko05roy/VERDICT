@@ -17,11 +17,15 @@ const config = new PreprodConfig();
 const logger = await createLogger(config.logDir);
 api.setLogger(logger);
 
-const seed = process.env.SEED ?? toHex(Buffer.from(generateRandomSeed()));
+const seed = process.env.SEED ?? process.env.MIDNIGHT_WALLET_SEED ?? toHex(Buffer.from(generateRandomSeed()));
 const outPath = path.resolve(currentDir, '..', 'logs', 'preprod-deploy.json');
 
 console.log('\n[deploy-only] Building wallet...');
 const walletCtx = await api.buildWalletForPreprodDeploy(config, seed);
+if (process.env.DUST_STATUS_ONLY === '1') {
+  await walletCtx.wallet.stop();
+  process.exit(0);
+}
 const providers = api.configureDeployProviders(walletCtx, config);
 
 console.log('[deploy-only] Deploying verdict contract...');
@@ -30,10 +34,9 @@ const addr = contract.deployTxData.public.contractAddress;
 
 const record = {
   contractAddress: addr,
-  seed,
   network: 'preprod',
   deployedAt: new Date().toISOString(),
-  explorer: `https://explorer.preprod.midnight.network/contract/${addr}`,
+  explorer: `https://preprod.midnightexplorer.com/contract/${addr}`,
 };
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
@@ -44,10 +47,8 @@ console.log('  PREPROD CONTRACT DEPLOYED');
 console.log('════════════════════════════════════════');
 console.log(`  Address: ${addr}`);
 console.log(`  Explorer: ${record.explorer}`);
-console.log(`  Seed: ${seed}`);
 console.log('\n  Vercel / .env.local:');
 console.log(`  NEXT_PUBLIC_VERDICT_PREPROD_CONTRACT_ADDRESS=${addr}`);
-console.log(`  MIDNIGHT_WALLET_SEED=${seed}`);
 console.log(`\n  Saved: ${outPath}`);
 console.log('════════════════════════════════════════\n');
 

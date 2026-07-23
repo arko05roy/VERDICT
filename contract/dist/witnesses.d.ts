@@ -13,4 +13,7 @@ export type VerdictPrivateState = {
     currentTick: bigint;
     enemyPositions: bigint[];
 };
+export type CounterPrivateState = {
+    privateCounter: number;
+};
 export declare const witnesses: Witnesses<VerdictPrivateState>;

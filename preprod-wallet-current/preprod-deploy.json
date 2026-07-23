@@ -1,0 +1,12 @@
+{
+  "network": "preprod",
+  "contractAddress": "b3b8f32f51d28ca2265e29da8be2d08cd5c20ae4152adfdd452bdee9fc6242e3",
+  "transactionHash": "c5a9d20d3719b1cfb1ee471999c47c382d370cbe860b0a99bac9a641495d6bbd",
+  "transactionIdentifiers": [
+    "000a4c3d5c56d433e39af6f63a834cb9a4b45d33451a5e5ffbde2173a7f6475a2a",
+    "005d5fca5832a72951eca33ac3cf1efc1f040579d0780d9e2b45b911eda6a2d0f0"
+  ],
+  "blockHeight": 1784908,
+  "deployedAt": "2026-07-23T15:37:03.710Z",
+  "explorer": "https://explorer.preprod.midnight.network/contract/b3b8f32f51d28ca2265e29da8be2d08cd5c20ae4152adfdd452bdee9fc6242e3"
+}

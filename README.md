@@ -145,7 +145,7 @@ No more trusting platforms when they say "we follow the rules." Show me the proo
 |-------|-----------|
 | **Frontend** | Next.js 16, React 19, TypeScript 5, Tailwind CSS 4 |
 | **ZK Circuit** | Compact (Midnight), @midnight-ntwrk/compact-runtime |
-| **Blockchain** | Midnight (ledger v7) |
+| **Blockchain** | Midnight Preprod (ledger v8) |
 | **Proof Generation** | Midnight proof-server |
 | **Wallet** | @midnight-ntwrk/wallet-sdk |
 | **AI Assistance** | Google Gemini suggests Guardians and parameters only |
@@ -162,14 +162,18 @@ ratri/
 │   ├── src/app/              # Pages + API routes
 │   ├── src/lib/              # Midnight simulator, Compact validator, Gemini integration
 │   └── sdk/                  # Verdict SDK (TypeScript)
-├── contract/                 # ZK circuit + Midnight JS wrapper
-│   ├── src/verdict.compact   # THE circuit — 10 checks, ~940 constraints
-│   └── src/managed/          # Compiled ZK IR, prover/verifier keys
+├── contract/                 # ZK circuits + Midnight JS wrappers
+│   ├── src/verdict.compact       # Reference verifier — 10 checks, ~940 constraints
+│   ├── src/verdict-dao.compact   # Guardian registry, council and ruleset governance
+│   └── src/managed/              # Local test artifacts
 ├── tests/                    # Root-level contract smoke tests (rubric entry point)
 │   └── verdict.test.ts
 ├── counter-cli/              # Midnight CLI + Docker orchestration
 │   ├── standalone.yml        # Docker Compose: node + indexer + proof-server
 │   └── src/standalone.ts     # Boot local Midnight stack
+├── preprod-wallet-current/   # Wallet SDK 1.2 / Midnight.js 4.1 CLI deployer
+│   ├── src/deploy-current.ts # Verifier + DAO deploy flow
+│   └── src/managed/          # Preprod-compatible compiled artifacts
 ├── start.sh                  # One-command startup
 └── README.md
 ```
@@ -205,33 +209,54 @@ The simulator runs the full ZK circuit in-memory with pre-seeded example ruleset
 
 ---
 
-## Contract Address (Preprod)
+## Contract Addresses (Preprod)
 
-| Contract | Network | Address |
-|----------|---------|---------|
-| **VERDICT** (`verdict.compact`) | **Preprod** | **Not yet published** — deployment is blocked by the current Preprod RPC sync loop |
+Deployed from the unmodified Compact sources in `contract/src` on July 23, 2026.
+Both deployments are independently visible through the Preprod indexer.
 
-### One-time deploy (requires funded wallet)
+| Contract | Address | Transaction / block |
+|----------|---------|---------------------|
+| **VERDICT reference verifier** (`verdict.compact`) | [`b3b8f32f51d28ca2265e29da8be2d08cd5c20ae4152adfdd452bdee9fc6242e3`](https://explorer.preprod.midnight.network/contract/b3b8f32f51d28ca2265e29da8be2d08cd5c20ae4152adfdd452bdee9fc6242e3) | `c5a9d20d3719b1cfb1ee471999c47c382d370cbe860b0a99bac9a641495d6bbd` / `1784908` |
+| **VERDICT DAO** (`verdict-dao.compact`, threshold `1`) | [`257219f97796f9447d155fff4dfdf8c29decde9ac6584afb32916ec0fabf835b`](https://explorer.preprod.midnight.network/contract/257219f97796f9447d155fff4dfdf8c29decde9ac6584afb32916ec0fabf835b) | `a23bd277a3da3d78eb77319e5486565021e10164e34d3904e6acd3a014a01006` / `1785007` |
+
+### Reproduce the CLI deployment (no Lace)
+
+The deployed artifacts use Compact `0.31.1`, Compact runtime `0.16.0`,
+Midnight.js `4.1.1`, wallet SDK `1.2.0`, and proof-server `8.0.3`.
 
 ```bash
-cd counter-cli
-SEED=<your-funded-hex-seed> npm run deploy:preprod
+# From the repository root: start only the local proof server.
+docker compose -f counter-cli/proof-server.yml up -d
+
+cd preprod-wallet-current
+npm ci
+
+# Compile the actual repository contracts, including proving keys.
+./.compact/versions/0.31.1/aarch64-darwin/compactc \
+  ../contract/src/verdict.compact src/managed/verdict
+./.compact/versions/0.31.1/aarch64-darwin/compactc \
+  ../contract/src/verdict-dao.compact src/managed/verdict-dao
+
+# First use of a funded seed: replay ordered wallet history and save tDUST state.
+SEED=<64-character-funded-wallet-seed> npm run dust-parallel
+
+# Deploy the verifier, then the DAO.
+SEED=<same-seed> npm run deploy
+SEED=<same-seed> npm run deploy:dao
 ```
 
-The script prints `NEXT_PUBLIC_VERDICT_PREPROD_CONTRACT_ADDRESS` and `MIDNIGHT_WALLET_SEED`.
+The CLI connects to the remote Preprod node/indexer and the local proof server.
+It balances fees from the wallet's derived tDUST subwallet, submits each
+transaction, and writes `preprod-deploy.json` / `preprod-dao-deploy.json`.
 
-**Add both to [Vercel → verdict-jade → Settings → Environment Variables](https://vercel.com):**
+> **tNIGHT → tDUST:** do not wait for 10,000 tNIGHT. These deployments used one
+> 1,000-tNIGHT faucet grant. `npm run dust-parallel` fixes the apparent
+> conversion failure by replaying the funded wallet's ordered indexer history
+> and persisting `dust-snapshot.json`; the deploy commands refresh that
+> checkpoint before proving. Never commit or publish the wallet seed.
 
-| Variable | Value |
-|----------|-------|
-| `NEXT_PUBLIC_VERDICT_PREPROD_CONTRACT_ADDRESS` | contract address from deploy output |
-| `MIDNIGHT_WALLET_SEED` | seed from deploy output (secret) |
-| `MIDNIGHT_NETWORK_ID` | `preprod` |
-| `MIDNIGHT_PROOF_SERVER_URL` | `https://lace-proof-pub.preprod.midnight.network` |
-
-Redeploy Vercel after adding env vars. Verify on [Preprod explorer](https://explorer.preprod.midnight.network).
-
-> **No funded seed?** Run `npm run deploy:preprod` without `SEED` — it prints a faucet address. Fund at [faucet.preprod.midnight.network](https://faucet.preprod.midnight.network/), then re-run with the printed seed.
+For the web app, set `NEXT_PUBLIC_VERDICT_PREPROD_CONTRACT_ADDRESS` to the
+reference verifier address above. Keep `MIDNIGHT_WALLET_SEED` server-only.
 
 ---
 
@@ -242,9 +267,8 @@ Redeploy Vercel after adding env vars. Verify on [Preprod explorer](https://expl
 
 Connect Lace on Preprod, then **Run Verification** on a ruleset in Explore.
 
-The Vercel deployment currently proves the dashboard and API health endpoints are
-live. A public contract address must be added here after a successful funded-wallet
-deployment; do not submit the placeholder as a deployed contract.
+The dashboard and API health endpoints are live, and the reference verifier and
+DAO addresses above are confirmed on Preprod.
 
 ---
 
@@ -316,7 +340,7 @@ The short demo script is [docs/demo-script.md](docs/demo-script.md).
 | Lace connect/disconnect | ✅ Sidebar wallet |
 | Circuit from frontend | ✅ `verdict-client.ts` via Lace |
 | Privacy behavior | ✅ Witness hidden, verdict public |
-| Preprod contract | ⏳ Publish funded-wallet deployment address (see [submission checklist](docs/submission-checklist.md)) |
+| Preprod contracts | ✅ Verifier + DAO deployed and indexer-confirmed |
 | 15+ meaningful commits | ✅ 55 commits on `main` |
 | 3+ tests | ✅ 42 passing |
 | CI/CD | ✅ `.github/workflows/ci.yml` |

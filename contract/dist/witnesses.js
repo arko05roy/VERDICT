@@ -34,6 +34,6 @@ export const witnesses = {
     },
     getEnemyPositions(ctx) {
         return [ctx.privateState, ctx.privateState.enemyPositions];
-    },
+    }
 };
 //# sourceMappingURL=witnesses.js.map

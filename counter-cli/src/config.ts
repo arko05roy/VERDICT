@@ -54,10 +54,12 @@ export class PreviewConfig implements Config {
 
 export class PreprodConfig implements Config {
   logDir = path.resolve(currentDir, '..', 'logs', 'preprod', `${new Date().toISOString()}.log`);
-  indexer = 'https://indexer.preprod.midnight.network/api/v3/graphql';
-  indexerWS = 'wss://indexer.preprod.midnight.network/api/v3/graphql/ws';
+  indexer = 'https://indexer.preprod.midnight.network/api/v4/graphql';
+  indexerWS = 'wss://indexer.preprod.midnight.network/api/v4/graphql/ws';
   node = 'https://rpc.preprod.midnight.network';
-  proofServer = process.env.MIDNIGHT_PROOF_SERVER_URL ?? 'https://lace-proof-pub.preprod.midnight.network';
+  // The Preprod deployment guide uses a local proof server. Keep the public
+  // endpoint available as an explicit override for environments that need it.
+  proofServer = process.env.MIDNIGHT_PROOF_SERVER_URL ?? 'http://127.0.0.1:6300';
   constructor() {
     setNetworkId('preprod');
   }

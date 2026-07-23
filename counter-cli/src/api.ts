@@ -1,7 +1,7 @@
 import { type ContractAddress } from '@midnight-ntwrk/compact-runtime';
 import { Verdict, type VerdictPrivateState, witnesses } from '@midnight-ntwrk/verdict-contract';
-import * as ledger from '@midnight-ntwrk/ledger-v7';
-import { unshieldedToken } from '@midnight-ntwrk/ledger-v7';
+import * as ledger from '@midnight-ntwrk/ledger-v8';
+import { unshieldedToken } from '@midnight-ntwrk/ledger-v8';
 import { deployContract, findDeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
@@ -206,7 +206,7 @@ export const waitForSync = (wallet: WalletFacade) =>
 // a fresh in-memory wallet catches up. Deployment only needs recent unshielded
 // UTXOs and dust, so use a permissive catch-up window instead of waiting for a
 // full historical sync.
-const DEPLOY_SYNC_GAP = 2_000_000n;
+const DEPLOY_SYNC_GAP = BigInt(process.env.MIDNIGHT_DEPLOY_SYNC_GAP ?? '2000000');
 
 const isDeployReady = (state: { unshielded: { progress: { isStrictlyComplete: () => boolean }; balances: Record<string, bigint> }; dust: { state: { progress: { isCompleteWithin: (g: bigint) => boolean } } } }) =>
   (state.unshielded.progress.isStrictlyComplete() || (state.unshielded.balances[unshieldedToken().raw] ?? 0n) > 0n) &&
@@ -294,7 +294,40 @@ const registerForDustGeneration = async (
   unshieldedKeystore: UnshieldedKeystore,
   ready: (s: { isSynced: boolean; dust: { balance: (d: Date) => bigint }; unshielded: { availableCoins: readonly unknown[] } }) => boolean = (s) => s.isSynced,
 ): Promise<void> => {
-  const state = await Rx.firstValueFrom(wallet.state().pipe(Rx.filter(ready)));
+  let state = await Rx.firstValueFrom(wallet.state().pipe(Rx.filter(ready)));
+  const dustReceiverAddress = await wallet.dust.getAddress();
+  if (process.env.DUST_STATUS_ONLY === '1') {
+    const nightCoins = state.unshielded.availableCoins.map((coin: any) => ({
+      value: coin.value?.toString?.() ?? String(coin.value),
+      registeredForDustGeneration: coin.meta?.registeredForDustGeneration === true,
+      intentHash: coin.meta?.intentHash ?? null,
+    }));
+    console.log(`  DUST status: balance=${state.dust.balance(new Date()).toString()} specks, availableCoins=${state.dust.availableCoins.length}`);
+    console.log(`  NIGHT UTXOs: ${JSON.stringify(nightCoins)}`);
+    return;
+  }
+  const registeredCoins = state.unshielded.availableCoins.filter(
+    (coin: any) => coin.meta?.registeredForDustGeneration === true,
+  );
+  if (process.env.DUST_REPAIR === '1' && registeredCoins.length > 0) {
+    await withStatus(`Refreshing ${registeredCoins.length} NIGHT DUST registration(s)`, async () => {
+      const recipe = await wallet.deregisterFromDustGeneration(
+        registeredCoins,
+        unshieldedKeystore.getPublicKey(),
+        (payload) => unshieldedKeystore.signData(payload),
+      );
+      const finalized = await wallet.finalizeRecipe(recipe);
+      await wallet.submitTransaction(finalized);
+    });
+    state = await Rx.firstValueFrom(
+      wallet.state().pipe(
+        Rx.filter(ready),
+        Rx.filter((next) => next.unshielded.availableCoins.some(
+          (coin: any) => coin.meta?.registeredForDustGeneration !== true,
+        )),
+      ),
+    );
+  }
   if (state.dust.availableCoins.length > 0) {
     const dustBal = state.dust.balance(new Date());
     console.log(`  ✓ Dust tokens already available (${formatBalance(dustBal)} DUST)`);
@@ -320,6 +353,7 @@ const registerForDustGeneration = async (
       nightUtxos,
       unshieldedKeystore.getPublicKey(),
       (payload) => unshieldedKeystore.signData(payload),
+      dustReceiverAddress,
     );
     const finalized = await wallet.finalizeRecipe(recipe);
     await wallet.submitTransaction(finalized);
@@ -383,8 +417,6 @@ export const buildWalletForPreprodDeploy = async (config: Config, seed: string):
 ${DIV}
   VERDICT Wallet (deploy mode)                 Network: ${networkId}
 ${DIV}
-  Seed: ${seed}
-
   Unshielded Address (send tNight here):
   ${unshieldedKeystore.getBech32Address()}
 ${DIV}
@@ -454,8 +486,6 @@ export const buildWalletAndWaitForFunds = async (config: Config, seed: string): 
 ${DIV}
   VERDICT Wallet                               Network: ${networkId}
 ${DIV}
-  Seed: ${seed}
-
   Unshielded Address (send tNight here):
   ${unshieldedKeystore.getBech32Address()}
 
