@@ -5,6 +5,19 @@ This project is built on the [Midnight Network](https://midnight.network/).
 [![CI](https://github.com/arko05roy/VERDICT/actions/workflows/ci.yml/badge.svg)](https://github.com/arko05roy/VERDICT/actions/workflows/ci.yml)
 [![Live demo](https://img.shields.io/badge/demo-Preprod%20dashboard-7c3aed)](https://verdict-jade.vercel.app)
 
+
+
+## Contract Addresses (Preprod)
+
+Deployed from the unmodified Compact sources in `contract/src` on July 23, 2026.
+Both deployments are independently visible through the Preprod indexer.
+
+| Contract | Address | Transaction / block |
+|----------|---------|---------------------|
+| **VERDICT reference verifier** (`verdict.compact`) | [`b3b8f32f51d28ca2265e29da8be2d08cd5c20ae4152adfdd452bdee9fc6242e3`](https://explorer.preprod.midnight.network/contract/b3b8f32f51d28ca2265e29da8be2d08cd5c20ae4152adfdd452bdee9fc6242e3) | `c5a9d20d3719b1cfb1ee471999c47c382d370cbe860b0a99bac9a641495d6bbd` / `1784908` |
+| **VERDICT DAO** (`verdict-dao.compact`, threshold `1`) | [`257219f97796f9447d155fff4dfdf8c29decde9ac6584afb32916ec0fabf835b`](https://explorer.preprod.midnight.network/contract/257219f97796f9447d155fff4dfdf8c29decde9ac6584afb32916ec0fabf835b) | `a23bd277a3da3d78eb77319e5486565021e10164e34d3904e6acd3a014a01006` / `1785007` |
+
+
 ### *Verdict doesn't ask systems to be honest. It makes dishonesty mathematically impossible.*
 
 **Universal Zero-Knowledge Integrity Protocol on Midnight**
@@ -208,16 +221,6 @@ match the project configuration.
 The simulator runs the full ZK circuit in-memory with pre-seeded example rulesets — no external infrastructure required.
 
 ---
-
-## Contract Addresses (Preprod)
-
-Deployed from the unmodified Compact sources in `contract/src` on July 23, 2026.
-Both deployments are independently visible through the Preprod indexer.
-
-| Contract | Address | Transaction / block |
-|----------|---------|---------------------|
-| **VERDICT reference verifier** (`verdict.compact`) | [`b3b8f32f51d28ca2265e29da8be2d08cd5c20ae4152adfdd452bdee9fc6242e3`](https://explorer.preprod.midnight.network/contract/b3b8f32f51d28ca2265e29da8be2d08cd5c20ae4152adfdd452bdee9fc6242e3) | `c5a9d20d3719b1cfb1ee471999c47c382d370cbe860b0a99bac9a641495d6bbd` / `1784908` |
-| **VERDICT DAO** (`verdict-dao.compact`, threshold `1`) | [`257219f97796f9447d155fff4dfdf8c29decde9ac6584afb32916ec0fabf835b`](https://explorer.preprod.midnight.network/contract/257219f97796f9447d155fff4dfdf8c29decde9ac6584afb32916ec0fabf835b) | `a23bd277a3da3d78eb77319e5486565021e10164e34d3904e6acd3a014a01006` / `1785007` |
 
 ### Reproduce the CLI deployment (no Lace)
 
