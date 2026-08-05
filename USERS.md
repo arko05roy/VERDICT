@@ -1,0 +1,72 @@
+# VERDICT Preprod User Cohort
+
+Public evidence for the 50-address Midnight Preprod onboarding cohort. The
+canonical machine-readable record is
+[`preprod-wallet-current/preprod-addresses-50.json`](preprod-wallet-current/preprod-addresses-50.json).
+
+| Field | Value |
+|---|---|
+| Network | Midnight Preprod |
+| Verified recipients | 50 unique addresses |
+| Funding | 1 tNIGHT per address / 50 tNIGHT total |
+| Funding transaction | `75b9c6e79db272d1b30b614a1002ece4c15078ce332a54a8e720cffab34e1e46` |
+| Block | `1785235` |
+| Block hash | `15ed57c3adcaa4c6b8d5947181b451cf7461b2aee96e8e84c693aa8692b704f8` |
+| Indexer evidence | `indexerVerifiedRecipients: 50` |
+
+## Address register
+
+| # | Midnight Preprod address |
+|---:|---|
+| 1 | `mn_addr_preprod1v4q6s2a4qwj92ex3y0x6lfcmsuxyjyjw8g4gm88emx4c800y2lzqgpjjly` |
+| 2 | `mn_addr_preprod1pxlj5l7pkz86ytd6ffwfkrw9tdpyg9shx3m72ct8pvfaagjt0hms0sh62j` |
+| 3 | `mn_addr_preprod1s4v82yhp06huejx63d4yj28up04c5398ezq0ta0x9cwm94xwh5us508zcq` |
+| 4 | `mn_addr_preprod1zj02pq2au2n2pchr78psqpxnp805ywndqgpqgrm4vrnmj3v7zq8qzn7xx8` |
+| 5 | `mn_addr_preprod1mrswrrqgmqztd6w9ncdv8e5wkgtlvcfv0h2u0vu68uadtzlf3ndq4jfce8` |
+| 6 | `mn_addr_preprod1sxa7le69ps3jcdxe3e9kjkgql3fjcrtt48awzhd04arl7nc6vneqy3t9jj` |
+| 7 | `mn_addr_preprod1n54pfqat5rkn66c9z2u9pmal4kjf3nun400v5uceqlquww7mx20qmccw42` |
+| 8 | `mn_addr_preprod1pl595mdaas8x70874l2yhreqc3mu4ked0hy4r2jhagueypcqpmxstmsyku` |
+| 9 | `mn_addr_preprod1hfu27rp6dw354ycr57ydqy8hlkyztr99vknrktc9qjlavdcrj3us0ymm9s` |
+| 10 | `mn_addr_preprod1pgy8hfv208txhu6mrexd4h6x0hqe8hj2d5fylsfc7vfmueexs3nsyn3lum` |
+| 11 | `mn_addr_preprod1nqjqzz8faqvvcf3efpnfafxs26mx2kpumts3c069hcpe2jnc470qnscjd9` |
+| 12 | `mn_addr_preprod1x3tmkgdwzce8xe0348tuylzgh3v6kt5yzlxe33g02k3hjaenm4qs55y2cp` |
+| 13 | `mn_addr_preprod1twnjmv0kznwj358utuy26fnmn09rwqjctgnldvlz55psyxwkutwsfqjwsk` |
+| 14 | `mn_addr_preprod1arlh9lznhzcp7403q6pqluywclz7h9ldrg6cg09lwf2mrhh3t8wqzf0qem` |
+| 15 | `mn_addr_preprod1pyawvk5gm60pac905y5cfra8z3emsrqkayxw7fxx05pd8vyk6a2qa6jeyy` |
+| 16 | `mn_addr_preprod1ge5xfzafwtr6qp36th3wc8eq6vs402yy2ha656w9qqekm2q9cprqu28z0y` |
+| 17 | `mn_addr_preprod1zjmkdn0sjut90qmakray8s28mr2473q7y59xhv3j5kj5gx5da5zq43lrre` |
+| 18 | `mn_addr_preprod1tdam0j3ceqsk46aeqcya763p3xx0mwxge23hgwrk2zqglnmyrauqt0lseu` |
+| 19 | `mn_addr_preprod1wlee63y9fc0hhczxj9vuk89vfcaxduscwf2qfukvr2av8dfp2jwswd39a3` |
+| 20 | `mn_addr_preprod1j6fmtgwrrx3j2eyt9vgwluth355ha7h8eq2kfx6tredmhl4ld72s797ueh` |
+| 21 | `mn_addr_preprod1k6f29rzvzftprgfva9mqqu99ra7uw6vh0z86q4fu408pxqnh689svuer4l` |
+| 22 | `mn_addr_preprod1yt23g02hpv0023g7vcqqxlcg34mkudxjhxpusyvq0rfmt9y0sqvqzwhthp` |
+| 23 | `mn_addr_preprod1v0wjgn7k34307uwt3qweshp0wxtrcus876e92y30k3xapar0gdfqcxyqud` |
+| 24 | `mn_addr_preprod1te3ed2uhxasltlxrasdr7fa5v5qrjrdgnseqe88l93mz5ct5xeqqjsdv2g` |
+| 25 | `mn_addr_preprod1a98ywm2ln6hr5em04zhcxtjz6698yx3wsjaudd2l4fnhvz0dhx3qtaa08w` |
+| 26 | `mn_addr_preprod163av28axsmaglu35l0cz6k6uvzlqp3vc2phfnzd5g8alezu3ugwqnuztht` |
+| 27 | `mn_addr_preprod1errvq9r6n993vtqh64wppgn6tpdv7etl5ugn5sskzh6dd8645n8scnhccm` |
+| 28 | `mn_addr_preprod1c8rpegyt6pl54h9skagd3mfjrcs4q806hzhuxr4mcknaq2sch0xsjf8agj` |
+| 29 | `mn_addr_preprod1u60uvpmt3599erc353z32z2wlkwyufasyag2wpfcmyk4jhsnmuas7nw8ss` |
+| 30 | `mn_addr_preprod1ra8lrfrl8t3s0dnv4cr2ulkdveuxaryc5su9zgqyw5m7mcuc02wq6kpye9` |
+| 31 | `mn_addr_preprod1wpqdewjw7yndhwlpessrx4lhlmrry35mkr6g5zrsutqwcgd7c0cqlxdta2` |
+| 32 | `mn_addr_preprod1qffv4qk77xd86qwdttjwlrdqnhgzy48m0pctvlpy03s9767y069s5heuyt` |
+| 33 | `mn_addr_preprod1ahwm0y40k5wsv8tgaazems3g8ga26dxpfs73deqjje75ygts7x4suaq2se` |
+| 34 | `mn_addr_preprod1qcddlujel33sz3phtvpvllq639z4c7ffvex8fp5f4xlv6wq0yqlqfcx2ad` |
+| 35 | `mn_addr_preprod13rdyk74cmrhswqy4ptz2tu3q3cs9juvy899mfn9ve5thunzlthfsdzkznf` |
+| 36 | `mn_addr_preprod1gahyt52fnvt59ntpy5y5a9d3pf6fefaea9y0klzjqpk4q54m0tqqfd09wv` |
+| 37 | `mn_addr_preprod1h8tsmkv3qn8tu4ap7nhs7lvz7ayvcllpzwp4kleufy0w0hhgpr3s56wglu` |
+| 38 | `mn_addr_preprod1hz2d553d00zqd9jdx9f85ax5dy73gc02wn9q59jp6v0axmfacx7s06yq8h` |
+| 39 | `mn_addr_preprod1zccrtk07gv6xun75xtjtadue7leuxerqp94244ynlmqyw9g08yrss5caqk` |
+| 40 | `mn_addr_preprod1rulxssgh0xvzd09ccyddzw87g28wc506tnhwf7uhqm4edz96je9skyc7wn` |
+| 41 | `mn_addr_preprod19pz50xh0qhr2ef9lhf7535nq8c4kkrw590rt98ll9rqgu6gzs77qepk3e3` |
+| 42 | `mn_addr_preprod12w94y8slprxm67mk2xk5kvn5a9ngw3vme4awr9vkvc2wal3czzjswl2q02` |
+| 43 | `mn_addr_preprod1nh356epp2y594htw98q5aq5hz4dnwf96y3lma6x8n6wk7xyq4fssevwxs4` |
+| 44 | `mn_addr_preprod1ecczy9zp0uk64xqj49nu6e2pw20e96nsg3k5zkyjkasfuqq2062qd7hhgj` |
+| 45 | `mn_addr_preprod1an4skf5x0593n8zp4zhm40w70v6stjrqxznpx86x7wuyn2jqktkszrxukp` |
+| 46 | `mn_addr_preprod12xy8azu7vc5d8p7wq0lecn42wvz359x2m25dlnfrdyjseq8rl9dswpuyf4` |
+| 47 | `mn_addr_preprod1d39s0e094apjwj7u6vy4wy2df3cgpxunfvkngredmg7ytehpluyqn932z5` |
+| 48 | `mn_addr_preprod15ndrzhtzz3c4nlwr9xppfpvrd2l3j298k7yvrfg5qf880ku0ayhqnlv00n` |
+| 49 | `mn_addr_preprod1kutl8ks2dqugl5fzhhszdqsklkp7dgvhm08jrpx84casvletzewqyqk60f` |
+| 50 | `mn_addr_preprod1uhy3hvcdk5zwtmnd8cp2u4mpnvmwed39evrz39fg4q0mffrq6vaqqss6r8` |
+
+

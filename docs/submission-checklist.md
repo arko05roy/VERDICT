@@ -4,6 +4,15 @@ This page is the single source of truth for the submission. Statuses are based o
 repository evidence and live checks; no deployment or social profile is claimed
 without a public link.
 
+## Level 5 evidence
+
+| Requirement | Evidence |
+|---|---|
+| 50 verifiable Preprod users | [USERS.md](../USERS.md) lists all 50 unique addresses and the funding transaction/block evidence. |
+| Feedback loop documented | [FEEDBACK.md](../FEEDBACK.md) defines structured intake, triage, and the change loop. |
+| Updated usage documentation | [USAGE.md](../USAGE.md) documents live onboarding and verification. |
+| Minimum 20 meaningful commits | `git rev-list --count HEAD` reports 63 commits in this repository. |
+
 | Requirement | Status | Evidence / final action |
 |---|---|---|
 | Working MVP live on Preprod | ⏳ Blocked | Live dashboard: [verdict-jade.vercel.app](https://verdict-jade.vercel.app). The current wallet deploy attempt was blocked by the Preprod RPC runtime-version sync loop. Retry `SEED=<funded-hex-seed> npm run deploy:preprod`. |
