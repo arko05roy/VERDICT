@@ -342,8 +342,9 @@ npm test   # 42 tests (1 root + 10 verdict + 28 DAO + 3 files)
 
 The authoritative, judge-facing checklist is [docs/submission-checklist.md](docs/submission-checklist.md).
 The short demo script is [docs/demo-script.md](docs/demo-script.md).
-The Level 5 evidence pack is [USERS.md](USERS.md), [FEEDBACK.md](FEEDBACK.md),
-and [USAGE.md](USAGE.md).
+The Level 6 evidence pack is [USERS.md](USERS.md),
+[LAUNCH_USERS.md](LAUNCH_USERS.md), [FEEDBACK.md](FEEDBACK.md),
+[PROPOSAL.md](PROPOSAL.md), and the [docs index](docs/README.md).
 
 ## Level 2 / Level 3 Submission
 
@@ -353,7 +354,7 @@ and [USAGE.md](USAGE.md).
 | Circuit from frontend | ✅ `verdict-client.ts` via Lace |
 | Privacy behavior | ✅ Witness hidden, verdict public |
 | Preprod contracts | ✅ Verifier + DAO deployed and indexer-confirmed |
-| 20+ meaningful commits | ✅ 63 commits on `main` |
+| 20+ meaningful commits | ✅ 64 commits on `main` |
 | 3+ tests | ✅ 42 passing |
 | CI/CD | ✅ `.github/workflows/ci.yml` |
 | Product proposal | ✅ `docs/product-proposal.md` |

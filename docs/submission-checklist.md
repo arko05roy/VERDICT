@@ -4,14 +4,16 @@ This page is the single source of truth for the submission. Statuses are based o
 repository evidence and live checks; no deployment or social profile is claimed
 without a public link.
 
-## Level 5 evidence
+## Level 6 / Supermoon evidence
 
 | Requirement | Evidence |
 |---|---|
-| 50 verifiable Preprod users | [USERS.md](../USERS.md) lists all 50 unique addresses and the funding transaction/block evidence. |
-| Feedback loop documented | [FEEDBACK.md](../FEEDBACK.md) defines structured intake, triage, and the change loop. |
-| Updated usage documentation | [USAGE.md](../USAGE.md) documents live onboarding and verification. |
-| Minimum 20 meaningful commits | `git rev-list --count HEAD` reports 63 commits in this repository. |
+| 50 verifiable Preprod cohort addresses | [USERS.md](../USERS.md) lists all 50 unique addresses and the funding transaction/block evidence. |
+| 20 launch-user addresses | [LAUNCH_USERS.md](../LAUNCH_USERS.md) lists the first 20 addresses as a launch subset and links to the shared funding evidence. |
+| Feedback loop documented | [FEEDBACK.md](../FEEDBACK.md) defines structured intake, triage, implemented responses, and the next validation step. |
+| Product proposal | [PROPOSAL.md](../PROPOSAL.md) describes the MVP user journey, scope, and Level 6 focus. |
+| Updated documentation | [docs/README.md](README.md) indexes setup, usage, integration, checks, demo, proposal, and evidence. |
+| Minimum 20 meaningful commits | `git rev-list --count HEAD` reports 64 commits in this repository. |
 
 | Requirement | Status | Evidence / final action |
 |---|---|---|
@@ -24,7 +26,7 @@ without a public link.
 | Public GitHub repository | ✅ Done | [github.com/arko05roy/VERDICT](https://github.com/arko05roy/VERDICT) |
 | Product X profile | ⏳ Required | Create the product profile, then replace `X_PROFILE_URL` below and in the final submission form. |
 | Demo video | ✅ Repo link present | [YouTube demo](https://youtu.be/O64oQYzj__o); re-record if it does not show the final Preprod address. |
-| Minimum 15 meaningful commits | ✅ Done | 55 commits on `main` at audit time (`git rev-list --count HEAD`). |
+| Minimum 15 meaningful commits | ✅ Done | 64 commits on `main` at audit time (`git rev-list --count HEAD`). |
 
 ## Final deployment evidence
 
